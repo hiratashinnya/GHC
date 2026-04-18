@@ -123,7 +123,8 @@ phase: requirements | basic-design | detailed-design | implementation | testing 
 process: 1 | 2 | 3 | 4 | 5
 iteration: 1             # イテレーション番号（要件定義は 0 固定）
 version: "1.0"
-status: draft | awaiting-approval | approved | rejected
+status: draft | awaiting-approval | approved | rejected | under-revision
+tags: []                 # ロールバック影響時に ["impacted-by-rollback"] を付与
 input-refs:
   - path: "../requirements/artifact.md"
     version: "1.0"
@@ -455,7 +456,7 @@ PostToolUse（対象: docs/**/*.md, iter/**/*.md への書き込み）:
 
 ## ダッシュボード確認/更新スキル
 
-> **実装状況**: ⏸ スキル未作成
+> **実装状況**: ✅ スキル作成済み — `.github/skills/dashboard-sync/SKILL.md`（6フェーズ分の手順を1スキルに統合、引数でフェーズ指定）
 
 各フェーズのテンプレート構成要素に合わせたダッシュボード確認・更新手順を、フェーズごとの **`dashboard-sync-{phase}` スキル**として切り出す。オーケストレータはフェーズ遷移時にこのスキルを参照し、ダッシュボードのステータスマトリクスおよびコンポーネント別進捗を正確に更新する。
 
@@ -482,7 +483,7 @@ PostToolUse（対象: docs/**/*.md, iter/**/*.md への書き込み）:
 
 ## NG時の差し戻しルーティング
 
-> **実装状況**: ⏸ スキル未作成
+> **実装状況**: ✅ スキル作成済み — `.github/skills/routing-on-failure/SKILL.md`
 
 ①入力検証（`01-validation.md`）と⑤成果物検証（`05-verification.md`）でNG（FAIL / CONDITIONAL PASS）となった場合、**`routing-on-failure` スキル**（全フェーズ共通の1スキル）に基づいて適切なプロセスへ差し戻す。オーケストレータはこのスキルを参照して差し戻し先を判定する。
 
@@ -530,7 +531,7 @@ PostToolUse（対象: docs/**/*.md, iter/**/*.md への書き込み）:
 
 ```
 オーケストレータ:
-  1. ダッシュボード読み込み → dashboard-sync-{phase} スキルで整合性チェック → 必要なら修正
+  1. ダッシュボード読み込み → dashboard-sync スキルで整合性チェック → 必要なら修正
   2. 現在フェーズ・プロセスを特定する
   3. 次に進むべきアクションを判定:
      a. approval-required doc が awaiting-approval
@@ -543,7 +544,7 @@ PostToolUse（対象: docs/**/*.md, iter/**/*.md への書き込み）:
         → 対応フェーズのサブエージェントへ委譲
      e. 差分docが作成済み・未マージ
         → マージ処理サブエージェントへ委譲
-  4. サブエージェントの完了後、dashboard-sync-{phase} スキルでダッシュボードを再検証する
+  4. サブエージェントの完了後、dashboard-sync スキルでダッシュボードを再検証する
 ```
 
 ---
@@ -568,5 +569,7 @@ PostToolUse（対象: docs/**/*.md, iter/**/*.md への書き込み）:
 | 詳細設計分割 | 3層構造（全体サマリ → コンポーネントサマリ → 設計項目）でファイル分割 |
 | 詳細設計②検証 | `02-breakdown-validation.md` でサブプロセスとして分解の妥当性を検証 |
 | リスクID | `RISK-{phase略称}-NNN` 形式で統一。セクション名「未解決事項・リスク」 |
-| ダッシュボードスキル | `dashboard-sync-{phase}` スキルでフェーズ別に確認/更新手順を定義 |
-| NG差し戻し | `routing-on-failure` スキルで①⑤NG時の差し戻し先を判定 |
+| ダッシュボードスキル | `dashboard-sync` スキル（`.github/skills/dashboard-sync/`）でフェーズ別に確認/更新手順を定義 |
+| NG差し戻し | `routing-on-failure` スキル（`.github/skills/routing-on-failure/`）で①⑤NG時の差し戻し先を判定 |
+| イテレーション分割 | `iteration-splitting` スキル（`.github/skills/iteration-splitting/`）で大規模要求の分割基準・手順を定義 |
+| ドキュメントマージ | `doc-merge` スキル（`.github/skills/doc-merge/`）で差分→正本のマージ手順を定義 |
