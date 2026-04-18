@@ -12,6 +12,7 @@ input-refs:
 created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
+approved-at: "YYYY-MM-DD"
 approval-required: true
 ---
 
@@ -82,6 +83,14 @@ approval-required: true
 
 **AI推奨**: 選択肢X — 理由: ...
 **決定**: <!-- 人間が記入 -->
+
+---
+
+## 未解決事項・リスク
+
+| ID | 内容 | 対応方針 |
+|----|------|--------|
+| RISK-REL-001 | | |
 
 ---
 

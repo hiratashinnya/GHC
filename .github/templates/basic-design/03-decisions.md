@@ -12,6 +12,7 @@ input-refs:
 created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
+approved-at: "YYYY-MM-DD"
 approval-required: true
 ---
 
@@ -111,7 +112,7 @@ approval-required: true
 
 | ID | 内容 | 対応方針 |
 |----|------|---------|
-| R-001 | | |
+| RISK-BD-001 | | |
 
 ---
 

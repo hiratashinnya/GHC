@@ -3,39 +3,43 @@ doc-type: decision
 doc-kind: master
 phase: detailed-design
 process: 3
+layer: "L1"
 iteration: 1
 version: "1.0"
 status: awaiting-approval
 input-refs:
-  - path: "docs/detailed-design/02-breakdown.md"
+  - path: "docs/detailed-design/02-breakdown-overview.md"
+    version: "1.0"
+  - path: "docs/detailed-design/02-breakdown-validation.md"
     version: "1.0"
 created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
+approved-at: "YYYY-MM-DD"
 approval-required: true
 ---
 
-# ③ 意思決定・検討 — 詳細設計
+# ③ 意思決定サマリ（全体） — 詳細設計
 
-> **用途**: ②の分解結果を基に、設計パターン・アルゴリズム・テスト戦略の選択肢をAIが提案し、人間が承認する。
-> **⚠️ フェーズゲート**: このドキュメントが `status: approved` になるまで④詳細設計書の作成に進めない。
+> **用途**: 全コンポーネント横断の意思決定サマリ。各コンポーネント別の詳細は `components/{compId}/03-decisions-{compId}.md` を参照。
+> **⚠️ フェーズゲート**: このドキュメントが `status: approved` になるまで④成果物作成に進めない。
 
 ---
 
-## 意思決定サマリ
+## 全体方針の意思決定
 
 | 決定項目 | 選択結果 | 承認状態 |
 |---------|---------|---------|
-| API設計方針 | | ⏳ awaiting |
-| DBスキーマ設計方針 | | ⏳ awaiting |
-| 認証・認可実装方式 | | ⏳ awaiting |
+| API設計方針（共通） | | ⏳ awaiting |
+| DB設計方針（共通） | | ⏳ awaiting |
+| 認証・認可方式 | | ⏳ awaiting |
 | エラーハンドリング方針 | | ⏳ awaiting |
 | テスト戦略・カバレッジ目標 | | ⏳ awaiting |
 | バリデーション方針 | | ⏳ awaiting |
 
 ---
 
-## 決定項目 1: API設計方針
+## 決定項目 1: API設計方針（共通）
 
 | 選択肢 | メリット | デメリット |
 |--------|---------|-----------|
@@ -45,11 +49,10 @@ approval-required: true
 
 **AI推奨**: 選択肢X — 理由: ...
 **決定**: <!-- 人間が記入 -->
-**追加方針**: （バージョニング方針、URL設計規則など）
 
 ---
 
-## 決定項目 2: DBスキーマ設計方針
+## 決定項目 2: DB設計方針（共通）
 
 | 選択肢 | メリット | デメリット |
 |--------|---------|-----------|
@@ -77,7 +80,7 @@ approval-required: true
 
 ## 決定項目 4: エラーハンドリング方針
 
-- エラーレスポンス形式:（例: `{ "code": "ERR_001", "message": "...", "details": [...] }`）
+- エラーレスポンス形式:
 - HTTPステータスコード利用方針:
 - ロギング・トレーシング方針:
 
@@ -101,7 +104,7 @@ approval-required: true
 
 ## 決定項目 6: バリデーション方針
 
-- 入力バリデーション層:（APIゲートウェイ / コントローラ / ドメイン）
+- 入力バリデーション層:
 - バリデーションライブラリ:
 - サニタイゼーション方針:
 
@@ -110,11 +113,19 @@ approval-required: true
 
 ---
 
-## 未解決事項・リスク
+## コンポーネント別意思決定リンク
 
-| ID | 内容 | 対応方針 |
-|----|------|---------|
-| R-001 | | |
+| COMP-ID | コンポーネント名 | ファイル | ステータス |
+|---------|-------------|--------|-----------|
+| COMP-001 | | `components/COMP-001/03-decisions-COMP-001.md` | ─ |
+
+---
+
+## 全コンポーネント リスク集約テーブル
+
+| リスクID | COMP-ID | 内容 | 対応方針 | ステータス |
+|---------|---------|------|---------|-----------|
+| RISK-DD-001 | 全体 | | | Open |
 
 ---
 

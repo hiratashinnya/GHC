@@ -9,7 +9,7 @@ status: draft
 input-refs:
   - path: "docs/implementation/05-verification.md"
     version: "1.0"
-  - path: "docs/detailed-design/04-artifact.md"
+  - path: "docs/detailed-design/04-artifact-overview.md"
     version: "1.0"
 created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"

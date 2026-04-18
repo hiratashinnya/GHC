@@ -70,10 +70,10 @@ approval-required: false
 
 ## 依存関係マップ
 
-```
-F-001 → F-002 → F-003
-         ↓
-        F-004
+```mermaid
+graph LR
+    F-001 --> F-002 --> F-003
+    F-002 --> F-004
 ```
 
 ---

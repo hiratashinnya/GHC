@@ -12,6 +12,7 @@ input-refs:
 created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
+approved-at: "YYYY-MM-DD"
 approval-required: true
 ---
 
@@ -88,10 +89,11 @@ approval-required: true
 
 ---
 
-## 未解決事項・前提条件
+## 未解決事項・リスク
 
-- 事項1:
-- 事項2:
+| ID | 内容 | 対応方針 |
+|----|------|--------|
+| RISK-REQ-001 | | |
 
 ---
 

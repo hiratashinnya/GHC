@@ -54,16 +54,15 @@ approval-required: false
 
 ## 実装順序（依存関係考慮）
 
-```
-TASK-001（環境構築）
-   ↓
-TASK-002（DBマイグレーション）
-   ↓
-TASK-003（ドメインモデル）
-   ↓
-TASK-004（サービス層）
-   ↓
-TASK-005（APIコントローラ）
+```mermaid
+graph TD
+    TASK-001["TASK-001（環境構築）"]
+    TASK-002["TASK-002（DBマイグレーション）"]
+    TASK-003["TASK-003（ドメインモデル）"]
+    TASK-004["TASK-004（サービス層）"]
+    TASK-005["TASK-005（APIコントローラ）"]
+
+    TASK-001 --> TASK-002 --> TASK-003 --> TASK-004 --> TASK-005
 ```
 
 ---

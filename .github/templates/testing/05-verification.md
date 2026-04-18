@@ -14,6 +14,7 @@ input-refs:
 created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
+approved-at: "YYYY-MM-DD"
 approval-required: true
 ---
 

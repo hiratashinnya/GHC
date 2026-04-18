@@ -9,11 +9,12 @@ status: awaiting-approval
 input-refs:
   - path: "docs/implementation/04-artifact.md"
     version: "1.0"
-  - path: "docs/detailed-design/04-artifact.md"
+  - path: "docs/detailed-design/04-artifact-overview.md"
     version: "1.0"
 created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
+approved-at: "YYYY-MM-DD"
 approval-required: true
 ---
 
