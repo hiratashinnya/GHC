@@ -549,6 +549,121 @@ PostToolUse（対象: docs/**/*.md, iter/**/*.md への書き込み）:
 
 ---
 
+## スクリプト化候補（スキル内の機械的ロジック）
+
+> **実装状況**: ⏸ 設計のみ — スクリプト本体は未作成。作成時は `.github/hooks/scripts/` に配置し、PowerShell（組み込みコマンドレットのみ）または Python（標準ライブラリのみ）で実装する
+
+各スキルの判定ロジックのうち、AI 判断が不要で**決定的ルールに基づき機械的に実行可能**なものをスクリプト化する。スキル内ではスクリプト呼び出し結果を利用し、AI はスクリプトでは扱えない意味判断のみ担当する。
+
+### 呼び出し元の判定基準
+
+| 呼び出し元 | 基準 | 例 |
+|-----------|------|------|
+| **Hook（自動）** | ファイル書き込みのたびに毎回実行すべき / ゲートキーピング（ブロック判定）/ トリガー条件が明確で AI 判断不要 | フェーズゲート、ダッシュボード自動更新 |
+| **Skill（オンデマンド）** | ワークフロー内の特定ステップとして AI が前後の文脈とともに呼び出す / 実行タイミングがオーケストレータの判断に依存 / 結果を AI が解釈して次アクションを決定 | ロールバック範囲計算、マージ前提条件チェック |
+| **Hook + Skill（両用）** | 自動トリガー（Hook）と手動確認・セッション復元（Skill）の両方のユースケースがある | ダッシュボード構築パイプライン |
+
+### 共通ユーティリティ
+
+| # | スクリプト名 | 概要 | 呼び出し元 |
+|---|------------|------|-----------|
+| U-1 | `parse-frontmatter` | 指定ディレクトリ配下の `.md` ファイルから YAML フロントマターを一括パースし、JSON 配列として出力する | **共通ライブラリ** — Hook・Skill 双方から import |
+| U-2 | `validate-input-refs` | 各ドキュメントの `input-refs` に記載されたパスの存在確認、および参照先 `version` との一致検証 | **Skill** (`doc-merge` Step 6, `routing-on-failure` タグ除去時) |
+
+### Hook 専用
+
+| # | スクリプト名 | 概要 | 対応フック |
+|---|------------|------|----------|
+| H-1 | `check-phase-gate` | 書き込み対象ファイルのフェーズ・プロセスを特定し、前プロセスの `approval-required: true` ドキュメントが `status: approved` であるか検査する。未承認なら書き込みをブロックしエラーメッセージを返す。U-1 を内部利用 | **PreToolUse** — `docs/**/*.md`, `iter/**/*.md` への書き込み前 |
+
+### routing-on-failure 由来
+
+| # | スクリプト名 | 概要 | 呼び出し元 |
+|---|------------|------|-----------|
+| R-1 | `resolve-cascade-scope` | ロールバック対象（phase, process）を入力とし、カスケード影響範囲のドキュメント一覧（パス + 現在 status）を出力。同フェーズ内 / クロスフェーズ / 詳細設計サブプロセスの3パターンをカバー。フィルタ条件（既存ファイルのみ、`rejected` / `under-revision` を除外）も適用する | **Skill** (`routing-on-failure` Step 3) — AI が NG 理由を分類した後に呼び出す |
+| R-2 | `batch-update-status` | ドキュメントパス一覧・設定する `status` 値・付与する `tags` を入力とし、各ドキュメントのフロントマターを一括更新する。変更履歴セクションへのエントリ追記もサポートする | **Skill** (`routing-on-failure` Step 4b/4c) — R-1 の出力を受けて実行 |
+
+### dashboard-sync 由来
+
+| # | スクリプト名 | 概要 | 呼び出し元 |
+|---|------------|------|-----------|
+| D-1 | `build-status-matrix` | `docs/` 配下の全フェーズをスキャンし、各ドキュメントの `status` を絵文字にマッピングして、Markdown テーブル文字列（ステータスマトリクス）を生成する。詳細設計の ②v 列、コンポーネント別進捗テーブルも生成対象とする | **Hook + Skill** — PostToolUse で自動実行 / `dashboard-sync` スキル Step 1–3 でオンデマンド実行 |
+| D-2 | `extract-bottlenecks` | `approval-required: true` かつ未承認、`status: rejected`、`status: under-revision` のドキュメントを抽出し、ボトルネック一覧を Markdown リストとして出力する | **Hook + Skill** — PostToolUse で自動実行 / `dashboard-sync` スキル Step 4 でオンデマンド実行 |
+| D-3 | `patch-dashboard` | D-1・D-2 の出力を受け取り、`docs/dashboard.md` の該当セクションを差し替え、`last-updated` を現在時刻に更新する | **Hook + Skill** — PostToolUse のパイプライン末端 / `dashboard-sync` スキル Step 3–6 の末端 |
+
+> **PostToolUse フックのパイプライン**: `docs/**/*.md` / `iter/**/*.md` への書き込み検出 → U-1 → D-1 → D-2 → D-3 を順次実行してダッシュボードを自動更新する。`dashboard-sync` スキルから呼ぶ場合も同じパイプラインを使うが、スキル側では D-3 実行後に AI が「次アクション」セクションを生成する（Step 5）。
+
+### doc-merge 由来
+
+| # | スクリプト名 | 概要 | 呼び出し元 |
+|---|------------|------|-----------|
+| M-1 | `check-merge-prerequisites` | 差分ドキュメントのフロントマターを検証し、マージ前提条件（`status: approved`, `doc-kind: diff`, `base-version` 存在、ゲート文書の `approved-by`/`approved-at` 記入済み）を満たすか判定する | **Skill** (`doc-merge` Prerequisites) — マージ開始前にオーケストレータが呼ぶ |
+| M-2 | `detect-version-conflict` | 差分の `base-version` と正本の現行 `version` を比較し、一致/不一致を返す。不一致時はエラーメッセージにバージョン差を明示する | **Skill** (`doc-merge` Step 2) — M-1 通過後に呼ぶ |
+| M-3 | `bump-version` | 正本のフロントマターを読み取り、プロセス番号に基づくバージョンインクリメント（①②④ → minor, ③⑤ → minor + status 維持, クロスイテレーション → major）を実行する。`updated-at` も同時更新する | **Skill** (`doc-merge` Step 4) — AI の内容マージ（Step 3）完了後に呼ぶ |
+| M-4 | `post-merge-validate` | マージ後の正本に対し (a) YAML フロントマターの構文検証, (b) `input-refs` パス存在 + バージョン一致, (c) ドキュメント内 ID 参照（REQ-F-xxx, API-xxx 等）の存在確認を実行する | **Skill** (`doc-merge` Step 6) — 内部で U-2 を利用 |
+
+### iteration-splitting 由来
+
+| # | スクリプト名 | 概要 | 呼び出し元 |
+|---|------------|------|-----------|
+| I-1 | `check-split-threshold` | `docs/requirements/02-breakdown.md` をパースし、REQ-F 件数・サブシステム数・COMP-ID 数・高優先度 NFR カテゴリ数を集計して、分割必須閾値（>15, >2, >5, >3）との比較結果を返す | **Skill** (`iteration-splitting` Step 2) — 要件分解完了後にオーケストレータが呼ぶ |
+| I-2 | `verify-iteration-assignment` | 各 `04-artifact-iterN.md` に割り当てられた REQ-F/REQ-NF の一覧を集計し、(a) 全 REQ-F がちょうど1イテレーションに割当済み, (b) 循環依存なし, (c) 各ファイルの `input-refs` 正当性を検証する | **Skill** (`iteration-splitting` Step 6) — 内部で U-2 を利用 |
+
+### 呼び出し元サマリ
+
+```mermaid
+graph LR
+    subgraph "PreToolUse Hook"
+        H1["H-1 check-phase-gate"]
+    end
+
+    subgraph "PostToolUse Hook"
+        DPipe["D-1 → D-2 → D-3<br/>(dashboard pipeline)"]
+    end
+
+    subgraph "Skill: dashboard-sync"
+        DS["D-1 → D-2 → D-3<br/>+ AI: 次アクション決定"]
+    end
+
+    subgraph "Skill: routing-on-failure"
+        RF["AI: NG理由分類<br/>→ R-1 → R-2"]
+    end
+
+    subgraph "Skill: doc-merge"
+        DM["M-1 → M-2<br/>→ AI: 内容マージ<br/>→ M-3 → M-4"]
+    end
+
+    subgraph "Skill: iteration-splitting"
+        IS["I-1<br/>→ AI: グルーピング・文書作成<br/>→ I-2"]
+    end
+
+    subgraph "共通ライブラリ"
+        U1["U-1 parse-frontmatter"]
+        U2["U-2 validate-input-refs"]
+    end
+
+    H1 --> U1
+    DPipe --> U1
+    DS --> U1
+    RF --> U1
+    DM --> U1
+    IS --> U1
+    DM --> U2
+    IS --> U2
+    RF --> U2
+```
+
+### AI 判断が必要なため**スクリプト化しないロジック**
+
+| スキル | 該当ステップ | 理由 |
+|--------|------------|------|
+| `routing-on-failure` | Step 1–2（NG 理由分類 → 差し戻し先決定） | 指摘事項の意味的分類は AI の自然言語理解が必要 |
+| `doc-merge` | Step 3（内容マージ） | セクション単位の意味的統合・衝突解決が必要 |
+| `iteration-splitting` | Step 3（グルーピング）, Step 4–5（文書作成） | 機能親和性判断・文書作成は AI の理解力が必要 |
+| `dashboard-sync` | Step 5（次アクション決定） | プロジェクト状況の総合判断が必要 |
+
+---
+
 ## 決定済み方針まとめ
 
 > **実装状況**: 以下の表を参照
@@ -573,3 +688,4 @@ PostToolUse（対象: docs/**/*.md, iter/**/*.md への書き込み）:
 | NG差し戻し | `routing-on-failure` スキル（`.github/skills/routing-on-failure/`）で①⑤NG時の差し戻し先を判定 |
 | イテレーション分割 | `iteration-splitting` スキル（`.github/skills/iteration-splitting/`）で大規模要求の分割基準・手順を定義 |
 | ドキュメントマージ | `doc-merge` スキル（`.github/skills/doc-merge/`）で差分→正本のマージ手順を定義 |
+| スクリプト化 | 機械的判定ロジック14本を `.github/hooks/scripts/` に配置予定。**Hook 専用** 1本（H-1: PreToolUse フェーズゲート）/ **Hook + Skill 両用** 3本（D-1〜D-3: ダッシュボードパイプライン）/ **Skill 専用** 8本（R-1,R-2,M-1〜M-4,I-1,I-2）/ **共通ライブラリ** 2本（U-1,U-2） |
