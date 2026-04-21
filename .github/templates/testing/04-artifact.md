@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: artifact
 doc-kind: master
 phase: testing
@@ -15,6 +15,7 @@ created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
 approval-required: false
+tags: []
 ---
 
 # ④ テスト報告書（統合・E2Eテスト） — テスト

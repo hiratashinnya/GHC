@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: breakdown
 doc-kind: master
 phase: release
@@ -13,6 +13,7 @@ created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
 approval-required: false
+tags: []
 ---
 
 # ② リリース計画分解 — リリース

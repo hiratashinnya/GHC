@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: decision
 doc-kind: master
 phase: implementation
@@ -12,8 +12,9 @@ input-refs:
 created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
-approved-at: "YYYY-MM-DD"
+approved-at: null
 approval-required: true
+tags: []
 ---
 
 # ③ 意思決定・検討 — 実装（TDD）

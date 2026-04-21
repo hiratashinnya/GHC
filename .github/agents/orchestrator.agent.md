@@ -86,21 +86,21 @@ Before delegating **any** work, execute:
 
 ## Consistency Check Procedure
 
-Before delegating, run this check:
+> **計画中**: 将来的に `@dashboard-agent` サブエージェントへ委譲予定。詳細は `plan-systemDevWorkflow.prompt.md` の「D-pipeline スキル化計画」を参照。
 
-```
-for each docs/<phase>/0N-*.md:
-    read frontmatter.status
-    compare with dashboard matrix cell [phase][process]
-    if mismatch:
-        update dashboard to reflect actual file status
-        log: "⚠️ Inconsistency corrected: <phase>/<doc> was <dashboard-status>, actual: <file-status>"
+現時点では以下のパイプラインを直接実行する:
 
-for each iter/iterN/phaseX/0N-*.md:
-    read frontmatter.status
-    if unmerged and approved:
-        flag for merge step
-```
+1. **D-1** Status matrix: `python .github/scripts/build_status_matrix.py`
+   — Scans `docs/` and generates the phase × process emoji matrix
+2. **D-2** Bottlenecks: `python .github/scripts/extract_bottlenecks.py`
+   — Lists rejected / under-revision / approval-pending documents
+3. **D-3** Patch dashboard: `python .github/scripts/patch_dashboard.py`
+   — Applies D-1 + D-2 output to `docs/dashboard.md` in-place
+
+After the pipeline:
+
+4. Scan `iter/iterN/phaseX/0N-*.md` — if any diff doc has `status: approved` and is not yet merged, flag for merge step
+5. Log any corrections made
 
 ---
 
@@ -108,14 +108,17 @@ for each iter/iterN/phaseX/0N-*.md:
 
 When a diff document reaches `status: approved`:
 
-1. Read `iter/iterN/phaseX/0N-*.md` (the diff)
-2. Read `docs/<phase>/0N-*.md` (the master)
-3. Apply diff content to master (merge relevant sections)
-4. Increment master `version` (e.g. `"1.0"` → `"1.1"`)
-5. Update master `updated-at` to today's date
-6. Change master `status` to `approved`
-7. Update `docs/dashboard.md` status matrix cell
-8. Confirm merge completion to user
+1. **Pre-check (M-1)**: `python .github/scripts/check_merge_prerequisites.py <diff>`
+   — Verify status=approved, doc-kind=diff, base-version present, approval fields set
+2. **Version conflict (M-2)**: `python .github/scripts/detect_version_conflict.py <diff> <master>`
+   — If `diff.base-version ≠ master.version`, stop and request rebase
+3. **Content merge (AI)**: Read both documents; apply diff sections to master preserving structure
+4. **Bump version (M-3)**: `python .github/scripts/bump_version.py <master> [--cross-iteration]`
+   — Increments version; resets status to draft (gate docs ③⑤ keep approved)
+5. **Post-merge validation (M-4)**: `python .github/scripts/post_merge_validate.py <master>`
+   — Check YAML, input-refs, and document IDs; fix any issues before proceeding
+6. **Dashboard update**: Run the D-pipeline (D-1 → D-2 → D-3) as described in Consistency Check
+7. Confirm merge completion to user
 
 ---
 
@@ -155,6 +158,33 @@ Templates for all process documents are located in `.github/templates/`. Use the
 When starting a new iteration:
 
 1. Confirm scope with human (which features/subsystems are in this iteration)
-2. Create directory `iter/iterN/` with `phase2/` through `phase6/` subdirectories
-3. Update `docs/dashboard.md` with new iteration row
-4. Begin from フェーズ2 (basic-design) for the new iteration scope
+2. **Split check (I-1)**: `python .github/scripts/check_split_threshold.py`
+   — If thresholds exceeded, discuss splitting with human before proceeding
+3. Create directory `iter/iterN/` with `phase2/` through `phase6/` subdirectories
+4. Update `docs/dashboard.md` with new iteration row
+5. Begin from フェーズ2 (basic-design) for the new iteration scope
+6. After all iterations, **verify (I-2)**: `python .github/scripts/verify_iteration_assignment.py`
+   — Confirm all REQ-F assigned, no duplicates, input-refs valid
+
+---
+
+## Available Scripts
+
+All scripts are in `.github/scripts/` and output JSON to stdout.
+Debug is **per-script**: create `<script_name>.debug` in `.github/scripts/` to enable → logs to `<script_name>.debug.log`.
+
+| ID | Script | Purpose |
+|----|--------|---------|
+| U-1 | `parse_frontmatter.py` | Bulk-parse YAML frontmatter from .md files |
+| U-2 | `validate_input_refs.py` | Validate input-refs paths and versions |
+| R-1 | `resolve_cascade_scope.py` | List downstream docs affected by rollback |
+| R-2 | `batch_update_status.py` | Bulk-update status / tags / changelog |
+| D-1 | `build_status_matrix.py` | Generate dashboard status matrix Markdown |
+| D-2 | `extract_bottlenecks.py` | Find blocked / rejected / under-revision docs |
+| D-3 | `patch_dashboard.py` | Rebuild and patch dashboard.md in-place |
+| M-1 | `check_merge_prerequisites.py` | Verify diff doc is merge-ready |
+| M-2 | `detect_version_conflict.py` | Compare diff base-version with master |
+| M-3 | `bump_version.py` | Increment master version after merge |
+| M-4 | `post_merge_validate.py` | Post-merge YAML / refs / ID validation |
+| I-1 | `check_split_threshold.py` | Check if iteration splitting is required |
+| I-2 | `verify_iteration_assignment.py` | Verify REQ assignment across iterations |

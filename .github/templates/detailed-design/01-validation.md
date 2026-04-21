@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: validation
 doc-kind: master
 phase: detailed-design
@@ -15,6 +15,7 @@ created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
 approval-required: false
+tags: []
 ---
 
 # ① 入力検証レポート — 詳細設計

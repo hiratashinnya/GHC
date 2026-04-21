@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: verification
 doc-kind: master
 phase: detailed-design
@@ -23,6 +23,7 @@ created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
 approval-required: false
+tags: []
 ---
 
 # ⑤ コンポーネント別検証 — {compId}

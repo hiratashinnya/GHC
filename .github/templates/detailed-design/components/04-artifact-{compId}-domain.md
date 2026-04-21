@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: artifact
 doc-kind: master
 phase: detailed-design
@@ -16,6 +16,7 @@ created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
 approval-required: false
+tags: []
 ---
 
 # ④ ドメインモデル・DTO定義 — {compId}

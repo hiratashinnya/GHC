@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: artifact
 doc-kind: master
 phase: release
@@ -15,6 +15,7 @@ created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
 approval-required: false
+tags: []
 ---
 
 # ④ リリース実行・リリースノート — リリース

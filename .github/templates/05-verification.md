@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: verification
 doc-kind: master
 phase: PHASE_NAME
@@ -13,6 +13,7 @@ created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
 approval-required: true
+tags: []
 ---
 
 # ⑤ 成果物の検証 — [PHASE_DISPLAY_NAME]

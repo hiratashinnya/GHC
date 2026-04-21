@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: breakdown
 doc-kind: master
 phase: testing
@@ -13,6 +13,7 @@ created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
 approval-required: false
+tags: []
 ---
 
 # ② テストスイート分解 — テスト

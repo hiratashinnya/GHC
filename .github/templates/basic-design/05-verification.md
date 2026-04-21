@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: verification
 doc-kind: master
 phase: basic-design
@@ -14,8 +14,9 @@ input-refs:
 created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
-approved-at: "YYYY-MM-DD"
+approved-at: null
 approval-required: true
+tags: []
 ---
 
 # ⑤ アーキテクチャ設計検証・承認 — 基本設計

@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: breakdown
 doc-kind: master
 phase: detailed-design
@@ -14,6 +14,7 @@ created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
 approval-required: false
+tags: []
 ---
 
 # ②-v 分解の妥当性検証 — 詳細設計

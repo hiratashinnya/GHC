@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: artifact
 doc-kind: master
 phase: implementation
@@ -15,6 +15,7 @@ created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
 approval-required: false
+tags: []
 ---
 
 # ④ 実装完了サマリ — 実装（TDD）
@@ -95,6 +96,6 @@ src/
 
 ## 変更履歴
 
-| バージョン | 日付 | 変更内容 |
-|---------|------|---------|
-| 1.0 | YYYY-MM-DD | 初版（iter1 実装完了） |
+| バージョン | 日付 | 変更内容 | 変更者 |
+|---------|------|---------|---------|
+| 1.0 | YYYY-MM-DD | 初版（iter1 実装完了） |  |

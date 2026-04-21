@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: breakdown
 doc-kind: master
 phase: basic-design
@@ -15,6 +15,7 @@ created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
 approval-required: false
+tags: []
 ---
 
 # ② 構成要素の分解 — 基本設計

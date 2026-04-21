@@ -551,7 +551,7 @@ PostToolUse（対象: docs/**/*.md, iter/**/*.md への書き込み）:
 
 ## スクリプト化候補（スキル内の機械的ロジック）
 
-> **実装状況**: ⏸ 設計のみ — スクリプト本体は未作成。作成時は `.github/hooks/scripts/` に配置し、PowerShell（組み込みコマンドレットのみ）または Python（標準ライブラリのみ）で実装する
+> **実装状況**: ✅ 実装済み（H-1 を除く13本） — `.github/scripts/` に Python（標準ライブラリのみ）で配置。共通ライブラリ `_lib/` パッケージ（6モジュール分割: `_config`, `_debug`, `_io`, `_frontmatter`, `_paths`, `_dashboard`）を基盤とし、全スクリプトは JSON を stdout に出力。デバッグはスクリプト毎に `<script_name>.debug` ファイル有無で切替、ログは `<script_name>.debug.log` に出力。Hook用スクリプト（H-1）のみ `.github/hooks/scripts/` に配置予定
 
 各スキルの判定ロジックのうち、AI 判断が不要で**決定的ルールに基づき機械的に実行可能**なものをスクリプト化する。スキル内ではスクリプト呼び出し結果を利用し、AI はスクリプトでは扱えない意味判断のみ担当する。
 
@@ -664,6 +664,54 @@ graph LR
 
 ---
 
+## D-pipeline スキル化計画
+
+> **実装状況**: ⏸ 未実施 — 以下は設計のみ
+
+### 概要
+
+D-1→D-2→D-3 ダッシュボードパイプラインを専用スキル + サブエージェントとしてカプセル化し、オーケストレータから委譲方式で呼び出す。
+
+### コンポーネント
+
+#### 1. Skill: `dashboard-pipeline`
+
+配置: `.github/skills/dashboard-pipeline/SKILL.md`
+
+| Step | 内容 | スクリプト |
+|------|------|-----------|
+| 1 | `docs/` をスキャンしステータスマトリクス + コンポーネント進捗テーブルを生成 | D-1 `build_status_matrix.py` |
+| 2 | ブロック中 / 却下 / 差し戻し影響ドキュメントを抽出 | D-2 `extract_bottlenecks.py` |
+| 3 | `docs/dashboard.md` の該当セクションを差し替え・`last-updated` 更新 | D-3 `patch_dashboard.py` |
+| 4 | `iter/iterN/` 配下の未マージ承認済み差分docをスキャン | AI |
+| 5 | 結果サマリ（ボトルネック件数・未マージ一覧・next action 提案）を返却 | AI |
+
+#### 2. Agent: `dashboard-agent`
+
+配置: `.github/agents/dashboard-agent.agent.md`
+
+- **使用スキル**: `dashboard-pipeline`, `dashboard-sync`
+- **責務**:
+  - オーケストレータからの委譲を受けて D-pipeline を実行
+  - iter/ の未マージ承認済みdiffを検出・報告
+  - 標準ステータスレポート形式で結果を返却
+- **tools**: `[read, search, terminal]`
+
+#### 3. オーケストレータ変更点
+
+| 現在 | 変更後 |
+|------|--------|
+| Consistency Check で D-1〜D-3 を直接実行 | `@dashboard-agent` へ委譲 |
+| Merge 手順 Step 6 で D-pipeline を直接実行 | `@dashboard-agent` へ委譲 |
+
+### メリット
+
+- **関心の分離**: ダッシュボードロジックをオーケストレーションから独立
+- **再利用性**: 任意のエージェントが `@dashboard-agent` を呼び出し可能
+- **テスト容易性**: 単体で `@dashboard-agent` を呼び出してデバッグ可能
+
+---
+
 ## 決定済み方針まとめ
 
 > **実装状況**: 以下の表を参照
@@ -688,4 +736,5 @@ graph LR
 | NG差し戻し | `routing-on-failure` スキル（`.github/skills/routing-on-failure/`）で①⑤NG時の差し戻し先を判定 |
 | イテレーション分割 | `iteration-splitting` スキル（`.github/skills/iteration-splitting/`）で大規模要求の分割基準・手順を定義 |
 | ドキュメントマージ | `doc-merge` スキル（`.github/skills/doc-merge/`）で差分→正本のマージ手順を定義 |
-| スクリプト化 | 機械的判定ロジック14本を `.github/hooks/scripts/` に配置予定。**Hook 専用** 1本（H-1: PreToolUse フェーズゲート）/ **Hook + Skill 両用** 3本（D-1〜D-3: ダッシュボードパイプライン）/ **Skill 専用** 8本（R-1,R-2,M-1〜M-4,I-1,I-2）/ **共通ライブラリ** 2本（U-1,U-2） |
+| スクリプト化 | 機械的判定ロジック14本。非Hook用スクリプト13本は `.github/scripts/` に配置済み。**Hook 専用** 1本（H-1: PreToolUse フェーズゲート）は `.github/hooks/scripts/` に配置予定 / **Hook + Skill 両用** 3本（D-1〜D-3）/ **Skill 専用** 8本 / **共通ライブラリ** 2本。共通ライブラリ `_lib/` は6モジュールに分割済み（SRP準拠）。デバッグはスクリプト毎に独立 |
+| D-pipeline スキル化 | D-1→D-2→D-3 パイプラインを `dashboard-pipeline` スキル + `dashboard-agent` サブエージェントへ委譲方式に変更予定（✉ 未実施）|

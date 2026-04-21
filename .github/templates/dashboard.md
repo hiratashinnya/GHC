@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: dashboard
 doc-kind: master
 last-updated: "YYYY-MM-DD HH:MM"
@@ -42,6 +42,7 @@ last-updated: "YYYY-MM-DD HH:MM"
 - ⏳ `awaiting-approval`（フェーズゲート発動中）
 - 📝 `draft`
 - ❌ `rejected`
+- 🔙 `under-revision`
 - ─ `not-started`
 
 ---

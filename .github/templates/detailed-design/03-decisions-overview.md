@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: decision
 doc-kind: master
 phase: detailed-design
@@ -15,8 +15,9 @@ input-refs:
 created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
-approved-at: "YYYY-MM-DD"
+approved-at: null
 approval-required: true
+tags: []
 ---
 
 # ③ 意思決定サマリ（全体） — 詳細設計

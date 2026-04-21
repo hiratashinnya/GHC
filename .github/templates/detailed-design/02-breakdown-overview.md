@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: breakdown
 doc-kind: master
 phase: detailed-design
@@ -16,6 +16,7 @@ created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
 approval-required: false
+tags: []
 ---
 
 # ②-a 全体分解（コンポーネント配分・トレーサビリティ） — 詳細設計

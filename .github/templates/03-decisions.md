@@ -1,4 +1,4 @@
----
+﻿---
 doc-type: decision
 doc-kind: master
 phase: PHASE_NAME
@@ -13,6 +13,7 @@ created-at: "YYYY-MM-DD"
 updated-at: "YYYY-MM-DD"
 approved-by: null
 approval-required: true
+tags: []
 ---
 
 # ③ 意思決定・検討 — [PHASE_DISPLAY_NAME]
