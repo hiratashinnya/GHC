@@ -1,1 +1,3 @@
 .github/prompts/memo.md
+.github/hooks/scripts/__pycache__/*
+.github/scripts/_lib/__pycache__/*
