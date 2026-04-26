@@ -44,7 +44,7 @@
 
 ## イテレーション方針
 
-> **実装状況**: ✅ 設計完了 — オーケストレータの委譲ルールおよびディレクトリ構成（`iter/`）に反映済み。フック実装は未着手（⏸）
+> **実装状況**: ✅ 設計完了 — オーケストレータの委譲ルールおよびディレクトリ構成（`iter/`）に反映済み。`PreToolUse` / `PostToolUse` フック実装済み（`phase-gate.json`, `dashboard-sync.json`）
 
 
 大規模要求（スコープが広い・複数サブシステムにまたがる等）はフェーズ2以降を**複数イテレーション**に分割する。
@@ -64,7 +64,7 @@ Iteration 3: フェーズ2 → 6（追加機能セット B）
 
 ## フェーズゲート強制（フック）
 
-> **実装状況**: 🚧 一部実装 — オーケストレータのフェーズゲートチェック（ソフト強制）は完了。`PreToolUse` フックによる機械的ブロックは**未実装**（⏸ フック作成フェーズで対応）
+> **実装状況**: ✅ 実装済み — オーケストレータのフェーズゲートチェック（ソフト強制）は完了。`PreToolUse` フックによる機械的ブロックも実装済み（`.github/hooks/scripts/check_phase_gate.py` + `.github/hooks/phase-gate.json`）
 
 
 フェーズ・プロセスのゲートは **`PreToolUse` フックで機械的にブロック**する。
@@ -390,7 +390,7 @@ docs/detailed-design/
 
 ## ダッシュボード
 
-> **実装状況**: 🚧 一部実装 — ダッシュボードテンプレート（`.github/templates/dashboard.md`）作成済み。`PostToolUse` フックによる自動更新は**未実装**（⏸ フック作成フェーズで対応）
+> **実装状況**: ✅ 実装済み — ダッシュボードテンプレート（`.github/templates/dashboard.md`）・実体ファイル（`docs/dashboard.md`）作成済み。`PostToolUse` フックによる自動更新も実装済み（`.github/hooks/scripts/post_tool_dashboard_sync.py` + `.github/hooks/dashboard-sync.json`）
 
 `docs/dashboard.md` はプロジェクト全体の進捗とボトルネックを可視化する。
 
@@ -515,7 +515,7 @@ PostToolUse（対象: docs/**/*.md, iter/**/*.md への書き込み）:
 
 ## ダッシュボード整合性チェックとオーケストレーション
 
-> **実装状況**: 🚧 一部実装 — オーケストレータ（`.github/agents/orchestrator.agent.md`）に整合性チェック手順・委譲ルールを実装済み。整合性チェックスキルは**未作成**（⏸ スキル作成フェーズで対応）。`dashboard-sync-{phase}` スキル・`routing-on-failure` スキル・フェーズ別サブエージェントも**未作成**（⏸）
+> **実装状況**: 🚧 一部実装 — オーケストレータ（`.github/agents/orchestrator.agent.md`）に整合性チェック手順・委譲ルールを実装済み。`dashboard-sync` スキル（全フェーズ統合、`.github/skills/dashboard-sync/SKILL.md`）・`dashboard-pipeline` スキル（`.github/skills/dashboard-pipeline/SKILL.md`）・`routing-on-failure` スキル作成済み。専用の整合性チェックスキルは未作成（`dashboard-pipeline` スキルで代替）。フェーズ別サブエージェント（`requirements-agent` 等）は**未作成**（⏸）
 
 
 オーケストレータ（メインエージェント）はサブエージェントへの委譲前に以下を実行する。
@@ -551,7 +551,7 @@ PostToolUse（対象: docs/**/*.md, iter/**/*.md への書き込み）:
 
 ## スクリプト化候補（スキル内の機械的ロジック）
 
-> **実装状況**: ✅ 実装済み（H-1 を除く13本） — `.github/scripts/` に Python（標準ライブラリのみ）で配置。共通ライブラリ `_lib/` パッケージ（6モジュール分割: `_config`, `_debug`, `_io`, `_frontmatter`, `_paths`, `_dashboard`）を基盤とし、全スクリプトは JSON を stdout に出力。デバッグはスクリプト毎に `<script_name>.debug` ファイル有無で切替、ログは `<script_name>.debug.log` に出力。Hook用スクリプト（H-1）のみ `.github/hooks/scripts/` に配置予定
+> **実装状況**: ✅ 全14本実装済み — `.github/scripts/` に Python（標準ライブラリのみ）で13本配置。共通ライブラリ `_lib/` パッケージ（6モジュール分割: `_config`, `_debug`, `_io`, `_frontmatter`, `_paths`, `_dashboard`）を基盤とし、全スクリプトは JSON を stdout に出力。デバッグはスクリプト毎に `<script_name>.debug` ファイル有無で切替、ログは `<script_name>.debug.log` に出力。Hook用スクリプトは `.github/hooks/scripts/` に3本配置済み（H-1: `check_phase_gate.py`、PostToolUse ラッパー: `post_tool_dashboard_sync.py`、共通デバッグ: `debug_logging.py`）
 
 各スキルの判定ロジックのうち、AI 判断が不要で**決定的ルールに基づき機械的に実行可能**なものをスクリプト化する。スキル内ではスクリプト呼び出し結果を利用し、AI はスクリプトでは扱えない意味判断のみ担当する。
 
@@ -587,11 +587,11 @@ PostToolUse（対象: docs/**/*.md, iter/**/*.md への書き込み）:
 
 | # | スクリプト名 | 概要 | 呼び出し元 |
 |---|------------|------|-----------|
-| D-1 | `build-status-matrix` | `docs/` 配下の全フェーズをスキャンし、各ドキュメントの `status` を絵文字にマッピングして、Markdown テーブル文字列（ステータスマトリクス）を生成する。詳細設計の ②v 列、コンポーネント別進捗テーブルも生成対象とする | **Hook + Skill** — PostToolUse で自動実行 / `dashboard-sync` スキル Step 1–3 でオンデマンド実行 |
-| D-2 | `extract-bottlenecks` | `approval-required: true` かつ未承認、`status: rejected`、`status: under-revision` のドキュメントを抽出し、ボトルネック一覧を Markdown リストとして出力する | **Hook + Skill** — PostToolUse で自動実行 / `dashboard-sync` スキル Step 4 でオンデマンド実行 |
-| D-3 | `patch-dashboard` | D-1・D-2 の出力を受け取り、`docs/dashboard.md` の該当セクションを差し替え、`last-updated` を現在時刻に更新する | **Hook + Skill** — PostToolUse のパイプライン末端 / `dashboard-sync` スキル Step 3–6 の末端 |
+| D-1 | `build-status-matrix` | `docs/` 配下の全フェーズをスキャンし、各ドキュメントの `status` を絵文字にマッピングして、Markdown テーブル文字列（ステータスマトリクス）を生成する。詳細設計の ②v 列、コンポーネント別進捗テーブルも生成対象とする | **共通ライブラリ（`_lib`）** — D-3 から内部呼び出しされる。単体実行は補助用途（デバッグ等） |
+| D-2 | `extract-bottlenecks` | `approval-required: true` かつ未承認、`status: rejected`、`status: under-revision` のドキュメントを抽出し、ボトルネック一覧を Markdown リストとして出力する | **共通ライブラリ（`_lib`）** — D-3 から内部呼び出しされる。単体実行は補助用途（デバッグ等） |
+| D-3 | `patch-dashboard` | `_lib` 関数を直接呼び出し（D-1・D-2 相当処理を内包）、`docs/dashboard.md` の全セクションを差し替えて `last-updated` を更新する自己完結型スクリプト | **Hook + Skill** — PostToolUse で自動実行 / `dashboard-pipeline` スキル Step 1 でオンデマンド実行 |
 
-> **PostToolUse フックのパイプライン**: `docs/**/*.md` / `iter/**/*.md` への書き込み検出 → U-1 → D-1 → D-2 → D-3 を順次実行してダッシュボードを自動更新する。`dashboard-sync` スキルから呼ぶ場合も同じパイプラインを使うが、スキル側では D-3 実行後に AI が「次アクション」セクションを生成する（Step 5）。
+> **PostToolUse フックのパイプライン**: `docs/**/*.md` / `iter/**/*.md` への書き込み検出 → D-3 単体実行でダッシュボードを自動更新する（D-3 が D-1・D-2 相当処理を内包）。`dashboard-pipeline` スキルから呼ぶ場合も D-3 単体実行の後、AI が未マージdiff検出と「次アクション」を生成する。
 
 ### doc-merge 由来
 
@@ -618,11 +618,11 @@ graph LR
     end
 
     subgraph "PostToolUse Hook"
-        DPipe["D-1 → D-2 → D-3<br/>(dashboard pipeline)"]
+        DPipe["D-3<br/>(自己完結: D-1・D-2内包)"]
     end
 
-    subgraph "Skill: dashboard-sync"
-        DS["D-1 → D-2 → D-3<br/>+ AI: 次アクション決定"]
+    subgraph "Skill: dashboard-pipeline"
+        DS["D-3<br/>+ AI: 未マージdiff検出・次アクション決定"]
     end
 
     subgraph "Skill: routing-on-failure"
@@ -666,11 +666,11 @@ graph LR
 
 ## D-pipeline スキル化計画
 
-> **実装状況**: ⏸ 未実施 — 以下は設計のみ
+> **実装状況**: ✅ 実装済み — `.github/skills/dashboard-pipeline/SKILL.md`・`.github/agents/dashboard-agent.agent.md` 作成済み。オーケストレータの整合性チェックと Merge 手順のダッシュボード更新ステップを `@dashboard-agent` 委譲に切り替え済み
 
 ### 概要
 
-D-1→D-2→D-3 ダッシュボードパイプラインを専用スキル + サブエージェントとしてカプセル化し、オーケストレータから委譲方式で呼び出す。
+D-3（`patch_dashboard.py`）は自己完結型で D-1・D-2 相当処理を内包する。`dashboard-pipeline` スキルは D-3 単体呼び出しを起点とし、その後 AI が未マージdiff検出と次アクション生成を担う構造でカプセル化した上で、オーケストレータから委譲方式で呼び出す。
 
 ### コンポーネント
 
@@ -737,4 +737,4 @@ D-1→D-2→D-3 ダッシュボードパイプラインを専用スキル + サ�
 | イテレーション分割 | `iteration-splitting` スキル（`.github/skills/iteration-splitting/`）で大規模要求の分割基準・手順を定義 |
 | ドキュメントマージ | `doc-merge` スキル（`.github/skills/doc-merge/`）で差分→正本のマージ手順を定義 |
 | スクリプト化 | 機械的判定ロジック14本。非Hook用スクリプト13本は `.github/scripts/` に配置済み。**Hook 専用** 1本（H-1: PreToolUse フェーズゲート）は `.github/hooks/scripts/` に配置予定 / **Hook + Skill 両用** 3本（D-1〜D-3）/ **Skill 専用** 8本 / **共通ライブラリ** 2本。共通ライブラリ `_lib/` は6モジュールに分割済み（SRP準拠）。デバッグはスクリプト毎に独立 |
-| D-pipeline スキル化 | D-1→D-2→D-3 パイプラインを `dashboard-pipeline` スキル + `dashboard-agent` サブエージェントへ委譲方式に変更予定（✉ 未実施）|
+| D-pipeline スキル化 | D-3 自己完結型実行（D-1・D-2内包）を `dashboard-pipeline` スキル + `dashboard-agent` サブエージェントへ委譲方式に変更済み（✅ 実装済み）|

@@ -86,21 +86,20 @@ Before delegating **any** work, execute:
 
 ## Consistency Check Procedure
 
-> **計画中**: 将来的に `@dashboard-agent` サブエージェントへ委譲予定。詳細は `plan-systemDevWorkflow.prompt.md` の「D-pipeline スキル化計画」を参照。
+Delegate to **`@dashboard-agent`**:
 
-現時点では以下のパイプラインを直接実行する:
+```
+@dashboard-agent: rebuild dashboard and report project state
+```
 
-1. **D-1** Status matrix: `python .github/scripts/build_status_matrix.py`
-   — Scans `docs/` and generates the phase × process emoji matrix
-2. **D-2** Bottlenecks: `python .github/scripts/extract_bottlenecks.py`
-   — Lists rejected / under-revision / approval-pending documents
-3. **D-3** Patch dashboard: `python .github/scripts/patch_dashboard.py`
-   — Applies D-1 + D-2 output to `docs/dashboard.md` in-place
+The dashboard-agent will:
+1. Run D-1 (status matrix), D-2 (bottlenecks), D-3 (patch dashboard)
+2. Scan `iter/` for unmerged approved diffs
+3. Return a structured result summary including bottleneck count, unmerged list, and next-action recommendation
 
-After the pipeline:
-
-4. Scan `iter/iterN/phaseX/0N-*.md` — if any diff doc has `status: approved` and is not yet merged, flag for merge step
-5. Log any corrections made
+After receiving the result:
+- If corrections were made, log them for the user
+- Use the "Next Action" line to determine the next delegation target
 
 ---
 
@@ -117,7 +116,7 @@ When a diff document reaches `status: approved`:
    — Increments version; resets status to draft (gate docs ③⑤ keep approved)
 5. **Post-merge validation (M-4)**: `python .github/scripts/post_merge_validate.py <master>`
    — Check YAML, input-refs, and document IDs; fix any issues before proceeding
-6. **Dashboard update**: Run the D-pipeline (D-1 → D-2 → D-3) as described in Consistency Check
+6. **Dashboard update**: Delegate to `@dashboard-agent` to rebuild the dashboard after merge
 7. Confirm merge completion to user
 
 ---
