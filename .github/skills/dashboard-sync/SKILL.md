@@ -27,7 +27,7 @@ Synchronize `docs/dashboard.md` with actual document frontmatter status across a
 ### Step 2: Map Status to Emoji
 
 | `status` value | Dashboard symbol |
-|---------------|-----------------|
+| --------------- | ----------------- |
 | `approved` | ✅ |
 | `awaiting-approval` | ⏳ |
 | `draft` | 📝 |

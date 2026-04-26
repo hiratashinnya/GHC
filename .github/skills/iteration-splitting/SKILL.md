@@ -22,7 +22,7 @@ Determine how to divide a large-scope project into multiple development iteratio
 Split into multiple iterations when ANY of the following is true:
 
 | Trigger | Threshold | Rationale |
-|---------|-----------|-----------|
+| --------- | ----------- | ----------- |
 | Functional requirements count | > 15 REQ-F items | Cognitive load per iteration |
 | Independent subsystem count | > 2 subsystems | Parallel workstream isolation |
 | Estimated component count | > 5 COMP-IDs | Design complexity management |
@@ -89,7 +89,7 @@ Record the iteration split in `docs/requirements/03-decisions.md`:
 ## Iteration Scope Split
 
 | Iteration | Theme | REQ-F IDs | REQ-NF IDs | Target COMP-IDs |
-|-----------|-------|-----------|------------|----------------|
+| ----------- | ------- | ----------- | ------------ | ---------------- |
 | iter1 (MVP) | Core functionality | REQ-F-001, ... | REQ-NF-001, ... | COMP-001, ... |
 | iter2 | Extended features | REQ-F-010, ... | | COMP-003, ... |
 ```

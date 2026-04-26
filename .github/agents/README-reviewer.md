@@ -39,6 +39,6 @@ GitHub Copilot カスタマイズファイル（Agents / Skills / Hooks / Prompt
 ## 関連ファイル
 
 | ファイル | 役割 |
-|---------|------|
+| --------- | ------ |
 | `.github/agents/reviewer.agent.md` | このエージェントの定義（英語） |
 | `.github/copilot-instructions.md` | YAML フロントマター規約の一次ソース |

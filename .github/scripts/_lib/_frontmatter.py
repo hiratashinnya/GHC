@@ -319,7 +319,7 @@ def append_changelog(path, date_str, reason, version="", author=""):
     else:
         text = (
             text.rstrip()
-            + f"\n\n## 変更履歴\n\n| 日付 | バージョン | 変更内容 | 担当者 |\n|------|-----------|---------|------|\n{row}\n"
+            + f"\n\n## 変更履歴\n\n| 日付 | バージョン | 変更内容 | 担当者 |\n| ------ | ----------- | --------- | ------ |\n{row}\n"
         )
     write_text(path, text)
     return True

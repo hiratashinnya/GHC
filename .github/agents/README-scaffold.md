@@ -44,6 +44,6 @@ GitHub Copilot カスタマイズファイルの新規作成専門エージェ�
 ## 関連ファイル
 
 | ファイル | 役割 |
-|---------|------|
+| --------- | ------ |
 | `.github/agents/scaffold.agent.md` | このエージェントの定義（英語） |
 | `.github/copilot-instructions.md` | YAML フロントマター規約・ディレクトリ構造の一次ソース |

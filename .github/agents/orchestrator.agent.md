@@ -74,7 +74,7 @@ Before delegating **any** work, execute:
 ## Delegation Rules
 
 | Condition | Action |
-|-----------|--------|
+| ----------- | -------- |
 | `approval-required` doc is `awaiting-approval` or `draft` | Prompt human for approval; output gate blocked message |
 | `approval-required` doc is `rejected` | Report rejection; ask human how to proceed |
 | Next process diff doc not yet created in `iter/iterN/phaseX/` | Delegate to appropriate phase subagent |
@@ -126,7 +126,7 @@ When a diff document reaches `status: approved`:
 When the gate is clear, delegate based on current phase:
 
 | Phase | Subagent (to be created) |
-|-------|--------------------------|
+| ------- | -------------------------- |
 | フェーズ1: 要件定義 | `requirements-agent` |
 | フェーズ2: 基本設計 | `basic-design-agent` |
 | フェーズ3: 詳細設計 | `detailed-design-agent` |
@@ -173,7 +173,7 @@ All scripts are in `.github/scripts/` and output JSON to stdout.
 Debug is **per-script**: create `<script_name>.debug` in `.github/scripts/` to enable → logs to `<script_name>.debug.log`.
 
 | ID | Script | Purpose |
-|----|--------|---------|
+| ---- | -------- | --------- |
 | U-1 | `parse_frontmatter.py` | Bulk-parse YAML frontmatter from .md files |
 | U-2 | `validate_input_refs.py` | Validate input-refs paths and versions |
 | R-1 | `resolve_cascade_scope.py` | List downstream docs affected by rollback |

@@ -74,7 +74,7 @@ def build_status_matrix_md(docs="docs"):
           _resolve_status_emoji (同モジュール)。
     """
     hdr = "| フェーズ | ① 検証 | ② 分解 | ②v 分解検証 | ③ 意思決定 | ④ 成果物 | ⑤ 検証承認 |"
-    sep = "|----------|---|---|-----|---|---|---|"
+    sep = "| ---------- | --- | --- | ----- | --- | --- | --- |"
     rows = [hdr, sep]
     for idx, phase in enumerate(PHASES, start=1):
         pp = os.path.join(docs, phase)
@@ -117,7 +117,7 @@ def build_component_table_md(docs="docs"):
         return None
     dd = os.path.join(docs, "detailed-design", "components")
     hdr = "| コンポーネントID | ②分解 | ③決定 | ④サマリ | ④API | ④Schema | ④Domain | ④TestCase | ⑤検証 |"
-    sep = "|-------------|------|------|---------|------|---------|---------|-----------|------|"
+    sep = "| ------------- | ------ | ------ | --------- | ------ | --------- | --------- | ----------- | ------ |"
     rows = [hdr, sep]
     for cid in comp_ids:
         cd = os.path.join(dd, cid)

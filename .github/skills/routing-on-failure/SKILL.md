@@ -26,7 +26,7 @@ Determine the rollback destination when a process outputs NG (FAIL or CONDITIONA
 #### ① Input Validation NG (`01-validation.md`)
 
 | NG Reason | Rollback Target | Action |
-|-----------|----------------|--------|
+| ----------- | ---------------- | -------- |
 | Previous phase artifact is incomplete or unapproved | Previous phase ④ or ⑤ | Complete/re-approve the previous phase artifact |
 | Contradiction between previous phase artifacts | Previous phase ③ | Re-examine decisions |
 | Requirements themselves are deficient (out of scope of previous phase) | `requirements/②` | Re-decompose/redefine requirements |
@@ -34,7 +34,7 @@ Determine the rollback destination when a process outputs NG (FAIL or CONDITIONA
 #### ⑤ Artifact Verification NG (`05-verification.md`)
 
 | NG Reason | Rollback Target | Action |
-|-----------|----------------|--------|
+| ----------- | ---------------- | -------- |
 | Minor quality shortfall in artifact | Same phase ④ | Fix/supplement the artifact |
 | Mismatch between decisions (③) and artifact | Same phase ③ | Re-examine decisions |
 | Decomposition granularity/scope is inappropriate | Same phase ② | Redo decomposition |
@@ -43,7 +43,7 @@ Determine the rollback destination when a process outputs NG (FAIL or CONDITIONA
 #### ②v Breakdown Validation NG (detailed-design only)
 
 | NG Reason | Rollback Target | Action |
-|-----------|----------------|--------|
+| ----------- | ---------------- | -------- |
 | Component allocation missing (COMP-ID not mapped in ②-a) | `02-breakdown-overview.md` | Update component allocation matrix |
 | Component breakdown not MECE (②-b has gaps/overlaps) | `components/{compId}/02-breakdown-{compId}.md` | Re-decompose the specific component |
 | Requirements traceability broken | `02-breakdown-overview.md` | Fix traceability matrix |

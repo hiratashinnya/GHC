@@ -22,7 +22,7 @@ GitHub Copilot を活用した AI 駆動開発のための環境リポジトリ�
 ## 言語・ツール制約
 
 | 許可 | 禁止 |
-|------|------|
+| ------ | ------ |
 | Markdown, YAML | その他のマークアップ・設定言語 |
 | Python（標準ライブラリ + Copilot SDK） | 非標準 Python パッケージ |
 | PowerShell（組み込みコマンドレットのみ） | 外部 PowerShell モジュール |
@@ -37,7 +37,7 @@ GitHub Copilot を活用した AI 駆動開発のための環境リポジトリ�
 ## カスタマイズの追加方法
 
 | 追加したいもの | 方法 |
-|--------------|------|
+| -------------- | ------ |
 | Agent | `@scaffold` に依頼 または `/create-agent` |
 | Skill | `@scaffold` に依頼 または `/create-skill` |
 | Hook | `@scaffold` に依頼 または `/create-hook` |

@@ -59,7 +59,7 @@ Next Action Recommendation   : <single line>
 ## Error Handling
 
 | Situation | Response |
-|-----------|----------|
+| ----------- | ---------- |
 | D-1/D-2/D-3 script exits non-zero | Report script error with stderr; stop pipeline; notify orchestrator |
 | `docs/dashboard.md` does not exist | Initialize from `.github/templates/dashboard.md`, then re-run D-3 |
 | `iter/` is empty or missing | Skip Step 4; report "No iter/ documents found" |

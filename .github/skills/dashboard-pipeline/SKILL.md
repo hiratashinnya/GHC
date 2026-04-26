@@ -52,7 +52,7 @@ Confirm `"success": true`. If the script exits with a non-zero code, report the 
 **Status → Emoji Mapping:**
 
 | `status` value      | Symbol |
-|---------------------|--------|
+| --------------------- | -------- |
 | `approved`          | ✅     |
 | `awaiting-approval` | ⏳     |
 | `draft`             | 📝     |
