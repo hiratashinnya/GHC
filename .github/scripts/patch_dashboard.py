@@ -23,7 +23,7 @@
     - エラー時は { success: false, error } を stdout へ出力後 sys.exit(1)。
 
 依存モジュール:
-    - _lib (debug_log, read_text, write_text, build_matrix_md, build_component_table_md,
+    - _lib (debug_log, read_text, write_text, build_status_matrix_md, build_component_table_md,
             find_bottleneck_lines, out_err, out_json)
     - sys, os, re, argparse, datetime.datetime
 """
@@ -90,7 +90,7 @@ def main():
         - エラー時 _lib.out_err を通じて sys.exit(1) で終了する。
 
     依存モジュール:
-        - _lib (debug_log, read_text, write_text, build_matrix_md, build_component_table_md,
+        - _lib (debug_log, read_text, write_text, build_status_matrix_md, build_component_table_md,
                 find_bottleneck_lines, out_err, out_json)
         - re, argparse, datetime.datetime
     """
@@ -105,7 +105,7 @@ def main():
     if text is None:
         _lib.out_err(f"Cannot read {args.dashboard}")
 
-    matrix_md = _lib.build_matrix_md(args.docs_dir)
+    matrix_md = _lib.build_status_matrix_md(args.docs_dir)
     comp_md = _lib.build_component_table_md(args.docs_dir)
 
     bn_lines = _lib.find_bottleneck_lines(args.docs_dir)

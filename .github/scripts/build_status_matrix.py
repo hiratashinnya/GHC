@@ -20,7 +20,7 @@
       build_status_matrix.debug.log にログを追記する。
 
 依存モジュール:
-    - _lib (debug_log, build_matrix_md, build_component_table_md, out_json)
+    - _lib (debug_log, build_status_matrix_md, build_component_table_md, out_json)
     - sys, os, argparse
 """
 import sys, os, argparse
@@ -50,7 +50,7 @@ def main():
         - _lib.debug_log によりデバッグログを書き込む場合がある。
 
     依存モジュール:
-        - _lib (debug_log, build_matrix_md, build_component_table_md, out_json)
+        - _lib (debug_log, build_status_matrix_md, build_component_table_md, out_json)
         - argparse
     """
     ap = argparse.ArgumentParser()
@@ -59,7 +59,7 @@ def main():
 
     _lib.debug_log(_S, "start", docs=args.docs_dir)
 
-    matrix = _lib.build_matrix_md(args.docs_dir)
+    matrix = _lib.build_status_matrix_md(args.docs_dir)
     comp = _lib.build_component_table_md(args.docs_dir)
 
     _lib.debug_log(_S, "done")

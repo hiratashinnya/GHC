@@ -15,7 +15,7 @@
       _io 由来      : read_text, write_text, norm, out_json, out_err
       _frontmatter  : parse_fm, scan_fm, update_fm, add_tags, append_changelog
       _paths 由来   : phase_path, proc_filepath, list_dd_components, list_dd_comp_ids
-      _dashboard 由来: build_matrix_md, build_component_table_md, find_bottleneck_lines
+      _dashboard 由来: build_status_matrix_md, build_component_table_md, find_bottleneck_lines
 
 副作用:
     なし (インポート自体は副作用なし)。

@@ -27,7 +27,7 @@ from ._frontmatter import parse_fm, scan_fm
 from ._paths import list_dd_comp_ids
 
 
-def _emoji_for(filepath):
+def _resolve_status_emoji(filepath):
     """ドキュメントのステータス絵文字を返す。ファイル不在時は NOT_STARTED を返す。
 
     責務:
@@ -53,7 +53,7 @@ def _emoji_for(filepath):
     return STATUS_EMOJI.get(fm.get("status", ""), NOT_STARTED)
 
 
-def build_matrix_md(docs="docs"):
+def build_status_matrix_md(docs="docs"):
     """ステータスマトリクス Markdown テーブル文字列を生成する。
 
     責務:
@@ -71,7 +71,7 @@ def build_matrix_md(docs="docs"):
 
     依存モジュール:
         - os (標準ライブラリ)、._config (PHASES, PHASE_LABEL, PROC_FILE, DD_OVERVIEW, DD_VALIDATION, NOT_STARTED)、
-          _emoji_for (同モジュール)。
+          _resolve_status_emoji (同モジュール)。
     """
     hdr = "| フェーズ | ① 検証 | ② 分解 | ②v 分解検証 | ③ 意思決定 | ④ 成果物 | ⑤ 検証承認 |"
     sep = "|----------|---|---|-----|---|---|---|"
@@ -79,9 +79,9 @@ def build_matrix_md(docs="docs"):
     for idx, phase in enumerate(PHASES, start=1):
         pp = os.path.join(docs, phase)
         fmap = DD_OVERVIEW if phase == "detailed-design" else PROC_FILE
-        cols: dict[str, str] = {str(p): _emoji_for(os.path.join(pp, fmap[p])) for p in range(1, 6)}
+        cols: dict[str, str] = {str(p): _resolve_status_emoji(os.path.join(pp, fmap[p])) for p in range(1, 6)}
         cols["2v"] = (
-            _emoji_for(os.path.join(pp, DD_VALIDATION))
+            _resolve_status_emoji(os.path.join(pp, DD_VALIDATION))
             if phase == "detailed-design"
             else NOT_STARTED
         )
@@ -110,7 +110,7 @@ def build_component_table_md(docs="docs"):
         なし。
 
     依存モジュール:
-        - os (標準ライブラリ)、._paths.list_dd_comp_ids、_emoji_for (同モジュール)。
+        - os (標準ライブラリ)、._paths.list_dd_comp_ids、_resolve_status_emoji (同モジュール)。
     """
     comp_ids = list_dd_comp_ids(docs)
     if not comp_ids:
@@ -121,7 +121,7 @@ def build_component_table_md(docs="docs"):
     rows = [hdr, sep]
     for cid in comp_ids:
         cd = os.path.join(dd, cid)
-        e = lambda fn, _cd=cd: _emoji_for(os.path.join(_cd, fn))
+        e = lambda fn, _cd=cd: _resolve_status_emoji(os.path.join(_cd, fn))
         rows.append(
             f"| {cid}"
             f" | {e(f'02-breakdown-{cid}.md')}"
