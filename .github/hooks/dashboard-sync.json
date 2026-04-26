@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "python .github/hooks/scripts/post_tool_dashboard_sync.py",
+        "timeout": 30
+      }
+    ]
+  }
+}
