@@ -22,7 +22,7 @@ Run the full D-1 → D-2 → D-3 automation pipeline to rebuild `docs/dashboard.
 - `docs/` directory exists with at least one phase subdirectory
 - `docs/dashboard.md` exists (initialized from `.github/templates/dashboard.md`)
 - Python is available in the workspace environment
-- Scripts `build_status_matrix.py`, `extract_bottlenecks.py`, and `patch_dashboard.py` exist under `.github/scripts/`
+- Scripts `patch_dashboard.py` and `scan_unmerged_diffs.py` exist under `.github/scripts/`
 
 ---
 
@@ -71,20 +71,23 @@ Read `docs/dashboard.md` to obtain the current project state:
 
 ---
 
-### Step 3: Detect Unmerged Approved Diffs (AI)
+### Step 3: Detect Unmerged Approved Diffs
 
-Scan `iter/` for approved but not-yet-merged diff documents:
+Execute the unmerged diff scanner:
 
-1. List all `iter/iter*/phase*/*.md` files
-2. For each file, read its frontmatter
-3. Select files where:
-   - `doc-kind: diff`
-   - `status: approved`
-   - `status` is NOT `merged`
-4. Cross-reference with the corresponding master in `docs/<phase>/` to confirm the merge has not occurred
-5. Output a list of: `[{diff_path, phase, process, iteration, base_version}]`
+```
+python .github/scripts/scan_unmerged_diffs.py --iter-dir iter --docs-dir docs
+```
 
-If the list is empty, report "No unmerged approved diffs found."
+`scan_unmerged_diffs.py` scans `iter/` recursively and:
+- Reads YAML frontmatter from every `iter/**/*.md`
+- Selects files where `doc-kind: diff` and `status: approved`
+- Cross-references the corresponding master in `docs/<phase>/` by comparing `master.version` vs `diff.base-version`; if `master.version <= base-version` (or master absent), the diff is considered unmerged
+
+Output JSON: `{ "unmerged": [{diff_path, master_path, phase, process, iteration, base_version}, ...], "total": N }`
+
+If `total` is `0`, report "No unmerged approved diffs found."
+If the script exits with a non-zero code, report the stderr output and stop.
 
 ---
 
