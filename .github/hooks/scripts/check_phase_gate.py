@@ -173,12 +173,12 @@ def collect_gate_docs(docs_dir: Path, iter_dir: Path) -> List[Dict]:
             iteration = fm.get("iteration")
 
             try:
-                process = int(process)
-            except (TypeError, ValueError):
+                process = int(process) if process is not None else None
+            except ValueError:
                 process = None
             try:
-                iteration = int(iteration)
-            except (TypeError, ValueError):
+                iteration = int(iteration) if iteration is not None else 0
+            except ValueError:
                 iteration = 0
 
             items.append(

@@ -79,7 +79,7 @@ def build_matrix_md(docs="docs"):
     for idx, phase in enumerate(PHASES, start=1):
         pp = os.path.join(docs, phase)
         fmap = DD_OVERVIEW if phase == "detailed-design" else PROC_FILE
-        cols = {p: _emoji_for(os.path.join(pp, fmap[p])) for p in range(1, 6)}
+        cols: dict[str, str] = {str(p): _emoji_for(os.path.join(pp, fmap[p])) for p in range(1, 6)}
         cols["2v"] = (
             _emoji_for(os.path.join(pp, DD_VALIDATION))
             if phase == "detailed-design"
@@ -87,8 +87,8 @@ def build_matrix_md(docs="docs"):
         )
         label = f"フェーズ{idx}: {PHASE_LABEL.get(phase, phase)}"
         rows.append(
-            f"| {label} | {cols[1]} | {cols[2]} | {cols['2v']}"
-            f" | {cols[3]} | {cols[4]} | {cols[5]} |"
+            f"| {label} | {cols['1']} | {cols['2']} | {cols['2v']}"
+            f" | {cols['3']} | {cols['4']} | {cols['5']} |"
         )
     return "\n".join(rows)
 

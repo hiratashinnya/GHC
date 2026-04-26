@@ -15,6 +15,7 @@
 """
 
 import os, sys, json
+from typing import NoReturn
 
 
 def read_text(path):
@@ -113,7 +114,7 @@ def out_json(data):
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
 
-def out_err(msg, code=1):
+def out_err(msg, code=1) -> NoReturn:
     """JSON エラーを stdout に出力し終了する。
 
     責務:
