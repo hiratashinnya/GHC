@@ -1,13 +1,31 @@
 #!/usr/bin/env python3
-"""D-3: patch-dashboard — Rebuild and patch docs/dashboard.md in-place.
+"""D-3: patch-dashboard — docs/dashboard.md をインプレースで再構築
 
-Usage:
-  python patch_dashboard.py [--docs-dir docs] [--dashboard docs/dashboard.md]
+責務:
+    D-1 / D-2 スクリプトと同じロジックを内部実行し、ダッシュボードの
+    ステータスマトリクス・コンポーネント進捗・ボトルネック各セクションを
+    更新し last-updated タイムスタンプも上書きする。
 
-Internally runs the same logic as D-1 and D-2, then replaces matching
-sections in the dashboard file and updates the last-updated timestamp.
+入力:
+    CLI 引数:
+      --docs-dir   <path>  docs ルートディレクトリ (デフォルト: docs)
+      --dashboard  <path>  更新対象ダッシュボードファイル (デフォルト: docs/dashboard.md)
 
-Output: JSON  { success, dashboard, updated_at }
+出力:
+    JSON (stdout):
+      { success, dashboard, updated_at }
+
+副作用:
+    - docs/dashboard.md の対象セクションを上書きする。
+    - last-updated フィールドを現在日時で更新する。
+    - patch_dashboard.debug ファイルが存在する場合、
+      patch_dashboard.debug.log にログを追記する。
+    - エラー時は { success: false, error } を stdout へ出力後 sys.exit(1)。
+
+依存モジュール:
+    - _lib (debug_log, read_text, write_text, build_matrix_md, build_component_table_md,
+            find_bottleneck_lines, out_err, out_json)
+    - sys, os, re, argparse, datetime.datetime
 """
 import sys, os, re, argparse
 from datetime import datetime
@@ -19,7 +37,26 @@ _S = "D-3:patch-dashboard"
 
 
 def _replace_section(text, heading_re, new_body):
-    """Replace content between a ## heading and the next ## (or EOF)."""
+    """## 見出しから次の ## または EOF までの内容を置換する。
+
+    責務:
+        heading_re にマッチする ## 見出しブロックの本文部分を
+        new_body で置換する。マッチしない場合は元の text をそのまま返す。
+
+    入力:
+        text (str)       : 置換対象の Markdown 全体文字列。
+        heading_re (str) : ## タイトルにマッチさせる正規表現パターン。
+        new_body (str)   : 見出し次のセクションに嵌め込む新しい本文。
+
+    出力:
+        str: 置換後の Markdown 全体文字列。
+
+    副作用:
+        なし。
+
+    依存モジュール:
+        - re (標準ライブラリ)。
+    """
     pat = re.compile(
         r"(## " + heading_re + r"[^\n]*\n)(.*?)(?=\n## |\Z)",
         re.DOTALL,
@@ -31,6 +68,32 @@ def _replace_section(text, heading_re, new_body):
 
 
 def main():
+    """ダッシュボードファイルの各セクションを再構築しインプレースで更新する。
+
+    責務:
+        D-1 / D-2 スクリプトと同じロジックの matrix / component / bottleneck を
+        生成し、dashboard.md の各セクションを置換後、last-updated を現在時刻で更新する。
+
+    入力:
+        sys.argv:
+          --docs-dir  <path>  docs ルートディレクトリ
+          --dashboard <path>  更新対象のダッシュボードファイル
+
+    出力:
+        stdout へ JSON を印字:
+          { success, dashboard, updated_at }
+
+    副作用:
+        - docs/dashboard.md のステータスマトリクス・コンポーネント進捗・ボトルネック・
+          last-updated セクションを上書きする。
+        - _lib.debug_log によりデバッグログを書き込む場合がある。
+        - エラー時 _lib.out_err を通じて sys.exit(1) で終了する。
+
+    依存モジュール:
+        - _lib (debug_log, read_text, write_text, build_matrix_md, build_component_table_md,
+                find_bottleneck_lines, out_err, out_json)
+        - re, argparse, datetime.datetime
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--docs-dir", default="docs")
     ap.add_argument("--dashboard", default="docs/dashboard.md")

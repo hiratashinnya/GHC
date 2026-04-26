@@ -1,11 +1,27 @@
 #!/usr/bin/env python3
-"""U-2: validate-input-refs — Check input-refs paths exist & versions match.
+"""U-2: validate-input-refs — input-refs のパス存在およびバージョン服表検証
 
-Usage:
-  python validate_input_refs.py <directory>
-  python validate_input_refs.py -f <file>
+責務:
+    各 Markdown ファイルの YAML フロントマター内 input-refs を読み取り、
+    参照先パスの存在とバージョン朝山を検証する。
 
-Output: JSON  { success, data: [{ path, ok, checked, issues }, ...] }
+入力:
+    CLI 引数:
+      dir <path>   検証対象ディレクトリ (再帰スキャン)
+      -f <path>    検証対象単一ファイル
+
+出力:
+    JSON (stdout):
+      { success, data: [{ path, ok, checked, issues }, ...] }
+
+副作用:
+    - validate_input_refs.debug ファイルが存在する場合、
+      validate_input_refs.debug.log にログを追記する。
+    - エラー時は { success: false, error } を stdout へ出力後 sys.exit(1)。
+
+依存モジュール:
+    - _lib (debug_log, parse_fm, scan_fm, out_err, out_json, norm)
+    - sys, os, argparse
 """
 import sys, os, argparse
 
@@ -16,6 +32,26 @@ _S = "U-2:validate-input-refs"
 
 
 def check_one(fpath):
+    """単一ファイルの input-refs を検証し結果ディクショナリを返す。
+
+    責務:
+        fpath の YAML フロントマターから input-refs を取得し、
+        各参照のパス存在とバージョン一致を検証する。
+
+    入力:
+        fpath (str): 検証対象の Markdown ファイルパス。
+
+    出力:
+        dict: { path, ok, checked, issues }
+              フロントマターなしの場合 { path, skip: True }。
+
+    副作用:
+        なし。
+
+    依存モジュール:
+        - _lib (parse_fm, norm)
+        - os
+    """
     fm = _lib.parse_fm(fpath)
     if not fm:
         return {"path": _lib.norm(fpath), "skip": True}
@@ -47,6 +83,29 @@ def check_one(fpath):
 
 
 def main():
+    """input-refs を検証し結果を JSON で出力する。
+
+    責務:
+        -f または dir 引数に応じて対象ファイルを解決し、check_one を寄び集め、
+        総合成功フラグと結果配列を JSON で stdout に出力する。
+
+    入力:
+        sys.argv:
+          dir <path>   対象ディレクトリ
+          -f <path>    対象単一ファイル
+
+    出力:
+        stdout へ JSON を印字:
+          { success, data: [{ path, ok, checked, issues }] }
+
+    副作用:
+        - _lib.debug_log によりデバッグログを書き込む場合がある。
+        - 引数未指定時 _lib.out_err を通じて sys.exit(1) で終了する。
+
+    依存モジュール:
+        - _lib (debug_log, scan_fm, out_err, out_json)
+        - argparse
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("dir", nargs="?")
     ap.add_argument("-f", "--file")

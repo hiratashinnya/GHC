@@ -1,16 +1,28 @@
 #!/usr/bin/env python3
-"""I-1: check-split-threshold — Check if iteration splitting is required.
+"""I-1: check-split-threshold — イテレーション分割要否チェック
 
-Usage:
-  python check_split_threshold.py [--breakdown docs/requirements/02-breakdown.md]
+責務:
+    breakdown ドキュメントの REQ-F / COMP / サブシステム / 高優先 NFR 数を集計し、
+    閾値超過の有無に基づいてイテレーション分割の必要性を判定する。
 
-Thresholds:
-  REQ-F count       > 15
-  Subsystem count   > 2
-  COMP-ID count     > 5
-  High-priority NFR > 3
+入力:
+    CLI 引数:
+      --breakdown <path>  分析対象の要件分解 Markdown ファイル
+                          (デフォルト: docs/requirements/02-breakdown.md)
 
-Output: JSON  { success, split_required, counts, thresholds, triggers }
+出力:
+    JSON (stdout):
+      { success, split_required, counts, thresholds, triggers }
+    閾値: REQ-F > 15 / サブシステム > 2 / COMP-ID > 5 / 高優先 NFR > 3
+
+副作用:
+    - check_split_threshold.debug ファイルが存在する場合、
+      check_split_threshold.debug.log にログを追記する。
+    - エラー時は { success: false, error } を stdout へ出力後 sys.exit(1)。
+
+依存モジュール:
+    - _lib (debug_log, read_text, out_err, out_json)
+    - sys, os, re, argparse
 """
 import sys, os, re, argparse
 
@@ -28,6 +40,28 @@ _THRESHOLDS = {
 
 
 def main():
+    """breakdown ドキュメントを解析してイテレーション分割の必要性を判定する。
+
+    責務:
+        引数 --breakdown のファイルを読み込み、正規表現で識別子を抽出して
+        閾値と比較し、結果を JSON で stdout に出力する。
+
+    入力:
+        sys.argv:
+            --breakdown <path>  要件分解 Markdown ファイルパス
+
+    出力:
+        stdout へ JSON を印字:
+            { success, split_required, counts, thresholds, triggers }
+
+    副作用:
+        - _lib.debug_log によりデバッグログを書き込む場合がある。
+        - エラー時 _lib.out_err を通じて sys.exit(1) で終了する。
+
+    依存モジュール:
+        - _lib (debug_log, read_text, out_err, out_json)
+        - re, argparse
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--breakdown", default="docs/requirements/02-breakdown.md",
                     help="Breakdown document to analyse")

@@ -1,4 +1,21 @@
-"""Dashboard status matrix and bottleneck builders."""
+"""Dashboard status matrix and bottleneck builders.
+
+責務:
+    docs/ 配下のドキュメントステータスからダッシュボード表示用の
+    Markdown テーブル文字列とボトルネック箇条リストを構築する。
+
+入力 / 出力:
+    各関数の docstring を参照。
+
+副作用:
+    なし (全関数純粋関数)。
+
+依存モジュール:
+    - os (標準ライブラリ)
+    - ._config (PHASES, PHASE_LABEL, PROC_FILE, DD_OVERVIEW, DD_VALIDATION, STATUS_EMOJI, NOT_STARTED)
+    - ._frontmatter (parse_fm, scan_fm)
+    - ._paths (list_dd_comp_ids)
+"""
 
 import os
 
@@ -11,7 +28,23 @@ from ._paths import list_dd_comp_ids
 
 
 def _emoji_for(filepath):
-    """Return status emoji for a document, or NOT_STARTED if missing."""
+    """ドキュメントのステータス絵文字を返す。ファイル不在時は NOT_STARTED を返す。
+
+    責務:
+        filepath の存在を確認し、YAML フロントマターの status 値をエモージに変換する。
+
+    入力:
+        filepath (str): ステータスを取得する Markdown ファイルパス。
+
+    出力:
+        str: STATUS_EMOJI 対応の絵文字、または NOT_STARTED (「―」)。
+
+    副作用:
+        なし。
+
+    依存モジュール:
+        - os (標準ライブラリ)、._frontmatter.parse_fm、._config (STATUS_EMOJI, NOT_STARTED)。
+    """
     if not os.path.exists(filepath):
         return NOT_STARTED
     fm = parse_fm(filepath)
@@ -21,7 +54,25 @@ def _emoji_for(filepath):
 
 
 def build_matrix_md(docs="docs"):
-    """Build the status-matrix Markdown table string."""
+    """ステータスマトリクス Markdown テーブル文字列を生成する。
+
+    責務:
+        PHASESリストを巡回して各プロセスファイルのステータスを取得し、
+        ダッシュボード 「フェーズ×プロセス」 Markdown テーブル文字列を返す。
+
+    入力:
+        docs (str): docs ルートディレクトリ (デフォルト: "docs")。
+
+    出力:
+        str: Markdown テーブル文字列 (ヘッダー・セパレーター・行を改行で結合)。
+
+    副作用:
+        なし。
+
+    依存モジュール:
+        - os (標準ライブラリ)、._config (PHASES, PHASE_LABEL, PROC_FILE, DD_OVERVIEW, DD_VALIDATION, NOT_STARTED)、
+          _emoji_for (同モジュール)。
+    """
     hdr = "| フェーズ | ① 検証 | ② 分解 | ②v 分解検証 | ③ 意思決定 | ④ 成果物 | ⑤ 検証承認 |"
     sep = "|----------|---|---|-----|---|---|---|"
     rows = [hdr, sep]
@@ -43,7 +94,24 @@ def build_matrix_md(docs="docs"):
 
 
 def build_component_table_md(docs="docs"):
-    """Build detailed-design component progress table or None."""
+    """詳細設計コンポーネント進捗テーブル文字列を返す。コンポーネントなし時は None。
+
+    責務:
+        detailed-design/components/ 配下の各コンポーネントディレクトリを巡回し、
+        各成果物ファイルのステータスをエモージで表す Markdown テーブルを返す。
+
+    入力:
+        docs (str): docs ルートディレクトリ (デフォルト: "docs")。
+
+    出力:
+        str | None: Markdown テーブル文字列。コンポーネントがなければ None。
+
+    副作用:
+        なし。
+
+    依存モジュール:
+        - os (標準ライブラリ)、._paths.list_dd_comp_ids、_emoji_for (同モジュール)。
+    """
     comp_ids = list_dd_comp_ids(docs)
     if not comp_ids:
         return None
@@ -70,7 +138,25 @@ def build_component_table_md(docs="docs"):
 
 
 def find_bottleneck_lines(docs="docs"):
-    """Return list of bottleneck Markdown bullet lines."""
+    """ボトルネック Markdown 箇条文字列のリストを返す。
+
+    責務:
+        docs/ 内の全ドキュメントをスキャンし、status が rejected / under-revision または
+        approval-required で未承認のドキュメントを箇条字列として返す。
+
+    入力:
+        docs (str): docs ルートディレクトリ (デフォルト: "docs")。
+
+    出力:
+        list[str]: Markdown 形式の箇条文字列のリスト。
+                   ボトルネックなし時は空リスト。
+
+    副作用:
+        なし。
+
+    依存モジュール:
+        - ._frontmatter.scan_fm。
+    """
     items = []
     for fm in scan_fm(docs):
         st = fm.get("status", "")

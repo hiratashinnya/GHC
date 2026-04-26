@@ -1,10 +1,29 @@
 #!/usr/bin/env python3
-"""R-1: resolve-cascade-scope — List downstream docs affected by rollback.
+"""R-1: resolve-cascade-scope — ロールバックにより影響を受けるダウンストリーム文書の列挙
 
-Usage:
-  python resolve_cascade_scope.py --target <file> [--ng-phase <phase>]
+責務:
+    ロールバック対象ファイルのフェーズ・プロセス番号を基に、
+    同一フェーズ内の後続プロセスおよび --ng-phase 指定時は
+    クロスフェーズの全ドキュメントをダウンストリーム候補として返す。
 
-Output: JSON  { success, target, cross_phase, downstream: [{ path, status }], count }
+入力:
+    CLI 引数:
+      --target  <path>   ロールバック対象ファイルパス
+      --ng-phase <phase>  NG 発生フェーズ (クロスフェーズ時に指定)
+
+出力:
+    JSON (stdout):
+      { success, target, cross_phase, downstream: [{ path, status }], count }
+
+副作用:
+    - resolve_cascade_scope.debug ファイルが存在する場合、
+      resolve_cascade_scope.debug.log にログを追記する。
+    - エラー時は { success: false, error } を stdout へ出力後 sys.exit(1)。
+
+依存モジュール:
+    - _lib (debug_log, parse_fm, phase_path, list_dd_components, out_err, out_json, norm,
+            DD_OVERVIEW, PROC_FILE, DD_VALIDATION)
+    - sys, os, argparse, pathlib.Path
 """
 import sys, os, argparse
 from pathlib import Path
@@ -18,7 +37,28 @@ _SKIP = ("rejected", "under-revision")
 
 
 def _collect_phase(phase, min_proc, docs="docs"):
-    """Existing docs in *phase* with process > min_proc, not already invalidated."""
+    """指定フェーズ内で process > min_proc の未無効化ドキュメントを列挙する。
+
+    責務:
+        指定フェーズのプロセスドキュメントから min_proc を超えるものを探し、
+        status が rejected / under-revision でないドキュメントを返す。
+        detailed-design フェーズは検証ファイルとコンポーネントドキュメントも対象に含む。
+
+    入力:
+        phase (str)  : フェーズ名 (例: "requirements")。
+        min_proc (int): こ超える process 番号の閾値。
+        docs (str)   : docs ルートディレクトリ (デフォルト: "docs")。
+
+    出力:
+        list[dict]: [{ path: str, status: str }, ...]。
+
+    副作用:
+        なし。
+
+    依存モジュール:
+        - _lib (phase_path, parse_fm, list_dd_components, DD_OVERVIEW, PROC_FILE, DD_VALIDATION, norm)
+        - os
+    """
     out = []
     pp = _lib.phase_path(phase, docs)
     fmap = _lib.DD_OVERVIEW if phase == "detailed-design" else _lib.PROC_FILE
@@ -49,10 +89,52 @@ def _collect_phase(phase, min_proc, docs="docs"):
 
 
 def _collect_all(phase, docs="docs"):
+    """指定フェーズの全ドキュメントを特定のプロセス制限なしで列挙する。
+
+    責務:
+        min_proc=0 で _collect_phase を呢び出し、フェーズ内の全ドキュメントを返す。
+
+    入力:
+        phase (str) : フェーズ名。
+        docs (str)  : docs ルートディレクトリ (デフォルト: "docs")。
+
+    出力:
+        list[dict]: [{ path: str, status: str }, ...]。
+
+    副作用:
+        なし。
+
+    依存モジュール:
+        - _collect_phase (同モジュール内)。
+    """
     return _collect_phase(phase, 0, docs)
 
 
 def main():
+    """ロールバックのカスケードスコープを解決しダウンストリーム一覧を JSON で出力する。
+
+    責務:
+        --target のフェーズ・プロセス番号を基に後続ドキュメントを収集し、
+        --ng-phase が異なるフェーズの場合はクロスフェーズ列挙も実行する。
+        重複を除去した一意履歴を JSON で出力する。
+
+    入力:
+        sys.argv:
+          --target <path>    ロールバック対象ファイルパス
+          --ng-phase <phase>  NG 発生フェーズ
+
+    出力:
+        stdout へ JSON を印字:
+          { success, target, cross_phase, downstream: [{ path, status }], count }
+
+    副作用:
+        - _lib.debug_log によりデバッグログを書き込む場合がある。
+        - エラー時 _lib.out_err を通じて sys.exit(1) で終了する。
+
+    依存モジュール:
+        - _lib (debug_log, parse_fm, out_err, out_json, norm)
+        - argparse, pathlib.Path
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--target", required=True, help="Rollback target file path")
     ap.add_argument("--ng-phase", help="Phase where NG was issued (cross-phase)")

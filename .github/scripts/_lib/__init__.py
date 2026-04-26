@@ -1,12 +1,27 @@
-"""_lib — Shared library package for workflow automation scripts.
+"""_lib — ワークフロー自動化スクリプト共通ライブラリパッケージ
 
-Modules:
-  _config      : Workflow constants (phases, process files, status emoji)
-  _debug       : Per-script debug flag and logging
-  _io          : File I/O and JSON output helpers
-  _frontmatter : YAML frontmatter parsing and updating
-  _paths       : Phase / process path helpers
-  _dashboard   : Dashboard matrix and bottleneck builders
+責務:
+    SDLC ワークフロースクリプト群で共通利用するユーティリティを提供する。
+    各サブモジュールの公開シンボルをフラットにエクスポートする。
+
+入力:
+    なし (パッケージインポート時に自動的にサブモジュールがロードされる)。
+
+出力:
+    エクスポートされるシンボル:
+      _config 由来  : PHASES, PHASE_INDEX, PHASE_LABEL, PROC_FILE,
+                       DD_OVERVIEW, DD_VALIDATION, STATUS_EMOJI, NOT_STARTED
+      _debug 由来   : is_debug, debug_log
+      _io 由来      : read_text, write_text, norm, out_json, out_err
+      _frontmatter  : parse_fm, scan_fm, update_fm, add_tags, append_changelog
+      _paths 由来   : phase_path, proc_filepath, list_dd_components, list_dd_comp_ids
+      _dashboard 由来: build_matrix_md, build_component_table_md, find_bottleneck_lines
+
+副作用:
+    なし (インポート自体は副作用なし)。
+
+依存モジュール:
+    - ._config, ._debug, ._io, ._frontmatter, ._paths, ._dashboard (内部モジュール)
 """
 
 from ._config import *

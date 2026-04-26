@@ -1,4 +1,23 @@
-"""Workflow constants and configuration."""
+"""Workflow constants and configuration.
+
+責務:
+    SDLC ワークフロー全体で共通使用する定数群を定義する。
+    フェーズ一覧、ファイル名マッピング、ステータス絵文字などを提供する。
+
+入力:
+    なし (定数のみ)。
+
+出力:
+    インポートした変数で参照する:
+    PHASES, PHASE_INDEX, PHASE_LABEL, PROC_FILE, DD_OVERVIEW, DD_VALIDATION,
+    STATUS_EMOJI, NOT_STARTED
+
+副作用:
+    なし (定数定義のみ)。
+
+依存モジュール:
+    なし (Python 組み込みのみ)。
+"""
 
 PHASES = [
     "requirements", "basic-design", "detailed-design",

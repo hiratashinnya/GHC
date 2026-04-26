@@ -1,17 +1,28 @@
 #!/usr/bin/env python3
-"""I-2: verify-iteration-assignment — Verify all REQs assigned across iterations.
+"""I-2: verify-iteration-assignment — 全 REQ-F のイテレーション割り当て検証
 
-Usage:
-  python verify_iteration_assignment.py
-         [--iterations-dir docs/requirements/iterations]
-         [--breakdown docs/requirements/02-breakdown.md]
+責務:
+    breakdown ドキュメントの全 REQ-F ID がイテレーションファイルに
+    割り当てられているか、重複がないか、input-refs が解決するかを検証する。
 
-Checks:
-  - All REQ-F IDs from breakdown are assigned to exactly one iteration
-  - No duplicate assignments
-  - input-refs in iteration files resolve correctly
+入力:
+    CLI 引数:
+      --iterations-dir <path>  イテレーション成果物ディレクトリ
+                               (デフォルト: docs/requirements/iterations)
+      --breakdown <path>       定義元の要件分解ドキュメント
+                               (デフォルト: docs/requirements/02-breakdown.md)
 
-Output: JSON  { success, total_reqs, assigned_reqs, unassigned, issues }
+出力:
+    JSON (stdout):
+      { success, total_reqs, assigned_reqs, unassigned, issues }
+
+副作用:
+    - verify_iteration_assignment.debug ファイルが存在する場合、
+      verify_iteration_assignment.debug.log にログを追記する。
+
+依存モジュール:
+    - _lib (debug_log, read_text, parse_fm, out_json, norm)
+    - sys, os, re, argparse, pathlib.Path
 """
 import sys, os, re, argparse
 from pathlib import Path
@@ -23,6 +34,28 @@ _S = "I-2:verify-iteration-assignment"
 
 
 def main():
+    """全 REQ-F のイテレーション割り当てを検証し結果を JSON で出力する。
+
+    責務:
+        breakdown から全 REQ-F を抽出し、イテレーションファイルの割り当て状況を
+        照合して未割り当て・重複・ input-refs 不整合を検証する。
+
+    入力:
+        sys.argv:
+          --iterations-dir <path>  iterations ディレクトリ
+          --breakdown <path>       分解ドキュメントパス
+
+    出力:
+        stdout へ JSON を印字:
+          { success, total_reqs, assigned_reqs, unassigned, issues }
+
+    副作用:
+        - _lib.debug_log によりデバッグログを書き込む場合がある。
+
+    依存モジュール:
+        - _lib (debug_log, read_text, parse_fm, out_json, norm)
+        - re, argparse, pathlib.Path
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--iterations-dir", default="docs/requirements/iterations",
                     help="Directory containing iteration artifact files")

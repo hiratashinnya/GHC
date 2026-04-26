@@ -1,15 +1,28 @@
 #!/usr/bin/env python3
-"""M-4: post-merge-validate — Validate master doc after merge.
+"""M-4: post-merge-validate — マージ後のマスタードキュメント検証
 
-Usage:
-  python post_merge_validate.py <master_file>
+責務:
+    マージ完了後の docs/ マスタードキュメントに対して以下を検証する。
+    a) YAML フロントマターが解析可能で必須フィールドを持つ
+    b) input-refs の展開先ファイルの存在とバージョン一致
+    c) ドキュメント ID が正形式である
 
-Checks:
-  a) YAML frontmatter is parsable and has required fields
-  b) input-refs targets exist and versions match
-  c) Document IDs are well-formed
+入力:
+    CLI 引数:
+      master_file <path>  検証対象の docs/ マスタードキュメントパス
 
-Output: JSON  { success, file, issues, ids_found }
+出力:
+    JSON (stdout):
+      { success, file, issues, ids_found }
+
+副作用:
+    - post_merge_validate.debug ファイルが存在する場合、
+      post_merge_validate.debug.log にログを追記する。
+    - エラー時は { success: false, error } を stdout へ出力後 sys.exit(1)。
+
+依存モジュール:
+    - _lib (debug_log, parse_fm, read_text, out_json, norm)
+    - sys, os, re, argparse
 """
 import sys, os, re, argparse
 
@@ -32,6 +45,28 @@ _REQUIRED_FIELDS = ["doc-type", "phase", "process", "iteration", "version", "sta
 
 
 def main():
+    """master_file を多角的に検証し結果を JSON で出力する。
+
+    責務:
+        フロントマターの必須フィールド確認、input-refs の存在・バージョン検証、
+        ドキュメント ID の抄出を実行し、検証結果を JSON で出力する。
+
+    入力:
+        sys.argv:
+          master_file <path>  docs/ マスタードキュメントパス
+
+    出力:
+        stdout へ JSON を印字:
+          { success, file, issues, ids_found }
+
+    副作用:
+        - _lib.debug_log によりデバッグログを書き込む場合がある。
+        - エラー時 _lib.out_err を通じて sys.exit(1) で終了する。
+
+    依存モジュール:
+        - _lib (debug_log, parse_fm, read_text, out_json, norm)
+        - re, argparse
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("master_file", help="docs/ master document to validate")
     args = ap.parse_args()
