@@ -46,6 +46,25 @@ def main() -> None:
     workspace_path = Path(workspace)
     patch_script = workspace_path / ".github" / "scripts" / "patch_dashboard.py"
 
+    # AI が書き込んだファイルパスを tool_input から取得する。
+    # Copilot のファイル書き込みツールは "path" キーを使う。
+    tool_input = payload.get("tool_input") or {}
+    changed_file: Optional[str] = tool_input.get("path") or tool_input.get("file_path")
+
+    # docs/ 配下の .md でなければ dashboard 更新は不要なのでスキップ
+    docs_dir = workspace_path / "docs"
+    if changed_file:
+        changed_path = Path(changed_file) if os.path.isabs(changed_file) else workspace_path / changed_file
+        try:
+            changed_path.resolve().relative_to(docs_dir.resolve())
+            is_docs_md = changed_path.suffix.lower() == ".md"
+        except ValueError:
+            is_docs_md = False
+        if not is_docs_md:
+            DEBUG.log("skip", reason="not a docs/ .md file", changed_file=changed_file)
+            out_json({"continue": True})
+            return
+
     cmd = [
         sys.executable,
         str(patch_script),
@@ -54,9 +73,17 @@ def main() -> None:
         "--dashboard",
         "docs/dashboard.md",
     ]
+    if changed_file:
+        # 相対パスに正規化（patch_dashboard.py 側も同様に処理）
+        try:
+            rel = str(Path(changed_file).resolve().relative_to(workspace_path.resolve()))
+        except ValueError:
+            rel = changed_file
+        cmd += ["--changed-file", rel]
+
     cmd_preview = " ".join(cmd)
 
-    DEBUG.log("start", cwd=workspace, tool_name=payload.get("tool_name"), cmd=cmd_preview)
+    DEBUG.log("start", cwd=workspace, tool_name=payload.get("tool_name"), changed_file=changed_file, cmd=cmd_preview)
 
     if not patch_script.is_file():
         out_json(

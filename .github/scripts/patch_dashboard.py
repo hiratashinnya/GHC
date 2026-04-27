@@ -8,8 +8,9 @@
 
 入力:
     CLI 引数:
-      --docs-dir   <path>  docs ルートディレクトリ (デフォルト: docs)
-      --dashboard  <path>  更新対象ダッシュボードファイル (デフォルト: docs/dashboard.md)
+      --docs-dir      <path>  docs ルートディレクトリ (デフォルト: docs)
+      --dashboard     <path>  更新対象ダッシュボードファイル (デフォルト: docs/dashboard.md)
+      --changed-file  <path>  AI が書き込んだファイルパス (省略時は全体 rebuild)
 
 出力:
     JSON (stdout):
@@ -24,7 +25,8 @@
 
 依存モジュール:
     - _lib (debug_log, read_text, write_text, build_status_matrix_md, build_component_table_md,
-            find_bottleneck_lines, out_err, out_json)
+            find_bottleneck_lines, build_phase_row, build_component_row, patch_bottleneck_line,
+            out_err, out_json)
     - sys, os, re, argparse, datetime.datetime
 """
 import sys, os, re, argparse
@@ -34,6 +36,90 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _lib
 
 _S = "D-3:patch-dashboard"
+
+
+def _classify_changed_file(changed_file, docs):
+    """変更ファイルのパスを解析してフェーズ情報とコンポーネントIDを返す。
+
+    責務:
+        changed_file が docs/ 配下のどのフェーズ・コンポーネントに属するかを
+        パス文字列のみで判定し辞書で返す。ファイルシステムアクセスは行わない。
+
+    入力:
+        changed_file (str) : 変更ファイルパス (絶対・相対どちらも可)。
+        docs (str)         : docs ルートディレクトリ。
+
+    出力:
+        dict | None: {
+            "phase":     str,        フェーズ名
+            "phase_idx": int,        1-based フェーズ番号
+            "comp_id":   str | None, コンポーネントID (detailed-design/components/ 配下のみ)
+        }
+        docs/ 配下でない .md ではない場合は None。
+
+    副作用:
+        なし。
+
+    依存モジュール:
+        - os, pathlib.Path (標準ライブラリ)、_lib.PHASES (定数)。
+    """
+    from pathlib import Path
+    try:
+        rel = Path(changed_file).resolve().relative_to(Path(docs).resolve())
+    except ValueError:
+        # docs/ 外のファイル
+        return None
+
+    parts = rel.parts
+    if not parts or not parts[0]:
+        return None
+
+    phase = parts[0]
+    if phase not in _lib.PHASES:
+        return None
+
+    phase_idx = _lib.PHASES.index(phase) + 1
+
+    # detailed-design/components/<cid>/ 配下か判定
+    comp_id = None
+    if (
+        phase == "detailed-design"
+        and len(parts) >= 3
+        and parts[1] == "components"
+    ):
+        comp_id = parts[2]
+
+    return {"phase": phase, "phase_idx": phase_idx, "comp_id": comp_id}
+
+
+def _replace_table_row(text, row_prefix_re, new_row):
+    """テーブル内の特定行のみを置換する。
+
+    責務:
+        row_prefix_re にマッチするテーブル行を new_row で置換する。
+        マッチしない場合は text をそのまま返す。
+
+    入力:
+        text (str)          : ダッシュボード全テキスト。
+        row_prefix_re (str) : 行冒頭部分にマッチさせる正規表現パターン。
+        new_row (str)       : 置換後の行文字列 (改行なし)。
+
+    出力:
+        str: 置換後のテキスト。
+
+    副作用:
+        なし。
+
+    依存モジュール:
+        - re (標準ライブラリ)。
+    """
+    return re.sub(
+        r"^" + row_prefix_re + r".*$",
+        new_row,
+        text,
+        count=1,
+        flags=re.MULTILINE,
+    )
 
 
 def _replace_section(text, heading_re, new_body):
@@ -71,13 +157,15 @@ def main():
     """ダッシュボードファイルの各セクションを再構築しインプレースで更新する。
 
     責務:
-        D-1 / D-2 スクリプトと同じロジックの matrix / component / bottleneck を
-        生成し、dashboard.md の各セクションを置換後、last-updated を現在時刻で更新する。
+        --changed-file 指定時は対象フェーズ行 / コンポーネント行 / ボトルネック行のみを
+        更新する targeted モードで動作する。
+        --changed-file 省略時は従来通り全体 rebuild を行う。
 
     入力:
         sys.argv:
-          --docs-dir  <path>  docs ルートディレクトリ
-          --dashboard <path>  更新対象のダッシュボードファイル
+          --docs-dir      <path>  docs ルートディレクトリ
+          --dashboard     <path>  更新対象のダッシュボードファイル
+          --changed-file  <path>  AI が書き込んだファイルパス (省略可)
 
     出力:
         stdout へ JSON を印字:
@@ -91,48 +179,79 @@ def main():
 
     依存モジュール:
         - _lib (debug_log, read_text, write_text, build_status_matrix_md, build_component_table_md,
-                find_bottleneck_lines, out_err, out_json)
+                find_bottleneck_lines, build_phase_row, build_component_row, patch_bottleneck_line,
+                out_err, out_json)
         - re, argparse, datetime.datetime
     """
     ap = argparse.ArgumentParser()
     ap.add_argument("--docs-dir", default="docs")
     ap.add_argument("--dashboard", default="docs/dashboard.md")
+    ap.add_argument("--changed-file", default=None)
     args = ap.parse_args()
 
-    _lib.debug_log(_S, "start", docs=args.docs_dir, dashboard=args.dashboard)
+    _lib.debug_log(_S, "start", docs=args.docs_dir, dashboard=args.dashboard, changed_file=args.changed_file)
 
     text = _lib.read_text(args.dashboard)
     if text is None:
         _lib.out_err(f"Cannot read {args.dashboard}")
 
-    matrix_md = _lib.build_status_matrix_md(args.docs_dir)
-    comp_md = _lib.build_component_table_md(args.docs_dir)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    bn_lines = _lib.find_bottleneck_lines(args.docs_dir)
-    bn_md = "\n".join(bn_lines) if bn_lines else "- なし"
+    if args.changed_file:
+        info = _classify_changed_file(args.changed_file, args.docs_dir)
+        _lib.debug_log(_S, "targeted", info=str(info))
 
-    legend = (
-        "\n> ②v列 は詳細設計フェーズのみ有効。他フェーズは ─ 固定。\n\n"
-        "凡例: ✅ approved / ⏳ awaiting-approval / 📝 draft"
-        " / ❌ rejected / 🔙 under-revision / ─ not-started\n"
-    )
+        if info is None:
+            # docs/ 外のファイル → 何もしない
+            _lib.debug_log(_S, "skip", reason="not under docs/")
+            _lib.out_json({"success": True, "dashboard": args.dashboard, "updated_at": now, "skipped": True})
+            return
 
-    text = _replace_section(
-        text,
-        r"フェーズ.*プロセス.*ステータスマトリクス",
-        f"\n{matrix_md}\n{legend}",
-    )
+        # 1. ステータスマトリクスの対応行を更新
+        phase_label_prefix = re.escape(
+            f"| フェーズ{info['phase_idx']}: {_lib.PHASE_LABEL.get(info['phase'], info['phase'])}"
+        )
+        new_phase_row = _lib.build_phase_row(info["phase"], info["phase_idx"], args.docs_dir)
+        text = _replace_table_row(text, phase_label_prefix, new_phase_row)
 
-    if comp_md:
-        text = _replace_section(
-            text,
-            r"詳細設計.*コンポーネント.*進捗",
-            f"\n{comp_md}\n",
+        # 2. コンポーネント行を更新 (detailed-design/components/ 配下の場合のみ)
+        if info["comp_id"]:
+            cid_prefix = re.escape(f"| {info['comp_id']}")
+            new_comp_row = _lib.build_component_row(info["comp_id"], args.docs_dir)
+            text = _replace_table_row(text, cid_prefix, new_comp_row)
+
+        # 3. ボトルネック行を 1 ファイル分のみ更新
+        text = _lib.patch_bottleneck_line(text, args.changed_file, args.docs_dir)
+
+    else:
+        # 全体 rebuild (従来モード)
+        matrix_md = _lib.build_status_matrix_md(args.docs_dir)
+        comp_md = _lib.build_component_table_md(args.docs_dir)
+
+        bn_lines = _lib.find_bottleneck_lines(args.docs_dir)
+        bn_md = "\n".join(bn_lines) if bn_lines else "- なし"
+
+        legend = (
+            "\n> ②v列 は詳細設計フェーズのみ有効。他フェーズは ─ 固定。\n\n"
+            "凡例: ✅ approved / ⏳ awaiting-approval / 📝 draft"
+            " / ❌ rejected / 🔙 under-revision / ─ not-started\n"
         )
 
-    text = _replace_section(text, r"ボトルネック", f"\n{bn_md}\n")
+        text = _replace_section(
+            text,
+            r"フェーズ.*プロセス.*ステータスマトリクス",
+            f"\n{matrix_md}\n{legend}",
+        )
 
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        if comp_md:
+            text = _replace_section(
+                text,
+                r"詳細設計.*コンポーネント.*進捗",
+                f"\n{comp_md}\n",
+            )
+
+        text = _replace_section(text, r"ボトルネック", f"\n{bn_md}\n")
+
     text = re.sub(
         r'(last-updated:\s*)"[^"]*"',
         rf'\1"{now}"',
