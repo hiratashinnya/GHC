@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "python .github/hooks/scripts/tool_input_spy.py --event PreToolUse",
+        "timeout": 5
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "python .github/hooks/scripts/tool_input_spy.py --event PostToolUse",
+        "timeout": 5
+      }
+    ]
+  }
+}
