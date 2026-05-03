@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Per-script debug flag and logging.
 
 責務:

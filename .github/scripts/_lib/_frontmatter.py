@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """YAML frontmatter parsing and updating.
 
 責務:

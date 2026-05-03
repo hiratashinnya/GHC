@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Workflow constants and configuration.
 
 責務:

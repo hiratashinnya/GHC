@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """File I/O and JSON output helpers.
 
 責務:

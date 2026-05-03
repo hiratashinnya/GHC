@@ -1,8 +1,9 @@
+#!/usr/bin/env python3
 """Phase and process path helpers.
 
 責務:
     フェーズ・プロセス番号から docs/ 類のパスを計算するユーティリティ集。
-    詳細設計コンポーネントディレクトリの洗い出し機能も提供する。
+    詳細設計コンポーネントディレクトリの洗い出し・変更ファイル分類機能も提供する。
 
 入力 / 出力:
     各関数の docstring を参照。
@@ -12,14 +13,14 @@
 
 依存モジュール:
     - os, pathlib.Path (標準ライブラリ)
-    - ._config (DD_OVERVIEW, PROC_FILE)
+    - ._config (DD_OVERVIEW, PROC_FILE, PHASES)
     - ._io (norm)
 """
 
 import os
 from pathlib import Path
 
-from ._config import DD_OVERVIEW, PROC_FILE
+from ._config import DD_OVERVIEW, PROC_FILE, PHASES
 from ._io import norm
 
 
@@ -120,3 +121,43 @@ def list_dd_comp_ids(docs="docs"):
     if not cdir.is_dir():
         return []
     return sorted(d.name for d in cdir.iterdir() if d.is_dir())
+
+
+def classify_changed_file(changed_file, docs="docs"):
+    """変更ファイルのパスを解析してフェーズ情報とコンポーネントIDを返す。
+
+    入力:
+        changed_file (str) : 変更ファイルパス (絶対・相対どちらも可)。
+        docs (str)         : docs ルートディレクトリ (デフォルト: "docs")。
+
+    出力:
+        dict | None: {
+            "phase":     str,        フェーズ名
+            "phase_idx": int,        1-based フェーズ番号
+            "comp_id":   str | None, コンポーネントID (detailed-design/components/ 配下のみ)
+        }
+        docs/ 配下でない場合は None。
+
+    副作用:
+        なし。
+    """
+    try:
+        rel = Path(changed_file).resolve().relative_to(Path(docs).resolve())
+    except ValueError:
+        return None
+
+    parts = rel.parts
+    if not parts:
+        return None
+
+    phase = parts[0]
+    if phase not in PHASES:
+        return None
+
+    phase_idx = PHASES.index(phase) + 1
+
+    comp_id = None
+    if phase == "detailed-design" and len(parts) >= 3 and parts[1] == "components":
+        comp_id = parts[2]
+
+    return {"phase": phase, "phase_idx": phase_idx, "comp_id": comp_id}
