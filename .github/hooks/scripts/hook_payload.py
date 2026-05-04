@@ -34,11 +34,17 @@ def read_payload() -> Dict:
 
     Returns an empty dict when stdin is a TTY (manual / interactive run),
     on read error, or when the payload is not valid JSON.
+
+    Reads via sys.stdin.buffer to ensure UTF-8 decoding regardless of the
+    platform default encoding (e.g. cp932 on Japanese Windows). VS Code hook
+    runners always send the payload as UTF-8 bytes; reading through the text
+    layer with a non-UTF-8 locale would introduce surrogate-escaped characters
+    that later cause UnicodeEncodeError when writing to log files.
     """
     if sys.stdin.isatty():
         return {}
     try:
-        raw = sys.stdin.read().strip()
+        raw = sys.stdin.buffer.read().decode("utf-8").strip()
     except OSError:
         return {}
     if not raw:
