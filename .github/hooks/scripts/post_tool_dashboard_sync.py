@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from debug_logging import HookDebugLogger
-from hook_output import HookOutput, EXIT_OK
+from hook_output import HookOutput
 from hook_payload import read_payload
 from tool_input import is_write_tool, get_written_paths
 
@@ -136,8 +136,7 @@ def main() -> None:
     result = _run_patch(cmd, workspace, cmd_preview, OUT)
 
     if result.returncode == 0:
-        # sys.exit(OUT.add_context("Dashboard synchronized from latest document frontmatter."))
-        sys.exit(EXIT_OK) # No output, just exit 0
+        return  # 何も出力しない（正常終了）
     else:
         sys.exit(OUT.warn(
             "Dashboard sync hook reported an error. "

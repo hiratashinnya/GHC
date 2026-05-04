@@ -23,12 +23,12 @@ def main() -> None:
             tool_name = event.tool_name
             tool_input = event.tool_input
 
-            # 書き込みアクセス制御
+            # 書き込みアクセス制御（必要な場合は tool_input のバリデーションも実装すること）
             if is_write_tool(tool_name):
                 paths = get_written_paths(tool_name, tool_input)
                 # 例: sys.exit(OUT.deny(f"書き込みをブロック: {paths}"))
 
-            # 読み取りアクセス制御
+            # 読み取りアクセス制御（必要な場合は tool_input のバリデーションも実装すること）
             if is_read_tool(tool_name):
                 paths = get_read_paths(tool_name, tool_input)
                 # 例: sys.exit(OUT.deny(f"読み取りをブロック: {paths}"))
