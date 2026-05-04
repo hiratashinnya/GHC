@@ -34,6 +34,8 @@ Use this skill when you need to:
 | [hooks-docs/hook-template.md](../hooks-docs/hook-template.md) | Full checklist, Python template, blocking pattern examples |
 | [hooks/scripts/hook_template.py](../hooks/scripts/hook_template.py) | Python hook script template with `HookOutput` usage examples |
 | [hooks/scripts/hook_output.py](../hooks/scripts/hook_output.py) | `HookOutput` class — all output control methods |
+| [hooks/scripts/hook_payload.py](../hooks/scripts/hook_payload.py) | `read_payload()`, `parse_payload()`, typed dataclasses for all 8 events |
+| [hooks/scripts/tool_input.py](../hooks/scripts/tool_input.py) | `WRITE_TOOLS`/`READ_TOOLS`, `get_written_paths()`, `get_read_paths()` |
 
 ---
 
@@ -112,6 +114,7 @@ Event fires → JSON payload → stdin → Python script → stdout JSON → Cop
 | Stop the entire session | `sys.exit(OUT.stop_session("reason"))` |
 | PostToolUse block | `sys.exit(OUT.block_post("reason"))` |
 | Stop event: prevent session ending | `sys.exit(OUT.block_stop("reason"))` |
+| Block a read-file access | `if is_read_tool(tool_name): paths = get_read_paths(tool_name, tool_input)`<br>`sys.exit(OUT.deny(f"Read blocked: {paths}"))` |
 
 > **Critical distinction**: `stop_session()` stops the **entire session**. Do NOT use it to block a single tool call — use `deny()` or `block()` instead.
 >
@@ -137,7 +140,8 @@ Event fires → JSON payload → stdin → Python script → stdout JSON → Cop
 1. **Identify the event** — which of the 8 events best fits the use case?
 2. **Read the payload spec** — open the corresponding `hooks-docs/payload-<Event>.md`
 3. **Copy the Python template** — from `hooks-docs/hook-template.md`
-4. **Implement logic** — use `_read_input()`, check required fields, implement the hook behavior
+4. **Import libraries** — `from hook_payload import read_payload, parse_payload` and event-specific class; `from tool_input import is_write_tool, get_written_paths, is_read_tool, get_read_paths` as needed
+5. **Implement logic** — use typed `event` fields, check required conditions, implement hook behavior
 5. **Add debug logging** — `DEBUG.log("input", ...)` at entry, `DEBUG.log("done", ...)` at exit
 6. **Choose output pattern** — from the Output Control Patterns table above
 7. **Create/update JSON config** — add event to `.github/hooks/<name>.json`
@@ -193,3 +197,5 @@ echo '{"hookEventName":"PreToolUse","tool_name":"run_in_terminal","tool_input":{
 | Stop hook using top-level `decision` | `Stop` uses `hookSpecificOutput.decision` (WITH wrapper) |
 | Non-zero exit code other than 2 causes block | Only exit code `2` blocks; other non-zero = warning only |
 | JSON output with `ensure_ascii=True` (default) | Always use `ensure_ascii=False` for Japanese characters |
+| Using `payload.get("tool_name")` directly in new scripts | Import `hook_payload` and use `parse_payload()` for typed access |
+| Blocking a `read_file` with write-tool logic | Use `is_read_tool()` + `get_read_paths()` — separate from write-tool path |

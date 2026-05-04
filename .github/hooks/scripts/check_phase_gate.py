@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from debug_logging import HookDebugLogger
+from hook_payload import read_payload
+from tool_input import is_write_tool, get_written_paths
 
 
 PHASES = [
@@ -266,57 +268,6 @@ def resolve_target_path(cli_target: Optional[str]) -> Optional[str]:
     return None
 
 
-def _read_hook_input() -> Optional[Dict]:
-    """Read hook payload from stdin when available."""
-    if sys.stdin.isatty():
-        return None
-    try:
-        raw = sys.stdin.read().strip()
-    except OSError:
-        return None
-    if not raw:
-        return None
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        return None
-
-
-def _collect_paths(obj, out: List[str]) -> None:
-    """Collect likely file paths from nested tool_input data."""
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            lk = str(k).lower()
-            if isinstance(v, str) and lk in {
-                "filepath",
-                "file_path",
-                "path",
-                "targetpath",
-                "target_path",
-            }:
-                out.append(v)
-            else:
-                _collect_paths(v, out)
-    elif isinstance(obj, list):
-        for item in obj:
-            _collect_paths(item, out)
-
-
-def _paths_from_hook_input(payload: Optional[Dict]) -> List[str]:
-    if not payload:
-        return []
-    out: List[str] = []
-    _collect_paths(payload.get("tool_input", {}), out)
-    dedup = []
-    seen = set()
-    for p in out:
-        n = p.replace("\\", "/")
-        if n not in seen:
-            seen.add(n)
-            dedup.append(p)
-    return dedup
-
-
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--target-path", default=None)
@@ -324,8 +275,17 @@ def main() -> None:
     ap.add_argument("--iter-dir", default="iter")
     args = ap.parse_args()
 
-    hook_payload = _read_hook_input()
-    targets = _paths_from_hook_input(hook_payload)
+    raw = read_payload()
+    tool_name = raw.get("tool_name", "")
+    tool_input = raw.get("tool_input") or {}
+
+    # Only gate-check write tools; read operations are always allowed.
+    if tool_name and not is_write_tool(tool_name):
+        out_json({"success": True, "blocked": False, "message": "Non-write tool skipped"})
+        return
+
+    raw_paths = get_written_paths(tool_name, tool_input) if tool_name else []
+    targets = [p.replace("\\", "/") for p in raw_paths]
 
     # CLI and env fallbacks for manual testing.
     fallback = resolve_target_path(args.target_path)

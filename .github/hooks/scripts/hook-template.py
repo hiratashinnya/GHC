@@ -1,32 +1,35 @@
 #!/usr/bin/env python3
 """<HookName> hook: <purpose>."""
 from __future__ import annotations
-import json, sys
 from pathlib import Path
-from typing import Dict, Optional
 from debug_logging import HookDebugLogger
 from hook_output import HookOutput
+from hook_payload import read_payload, parse_payload, PreToolUsePayload
+from tool_input import is_write_tool, get_written_paths, is_read_tool, get_read_paths
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEBUG = HookDebugLogger(SCRIPT_DIR, "<script_name>")
 
 
-def _read_input() -> Optional[Dict]:
-    if sys.stdin.isatty():
-        return None
-    raw = sys.stdin.read().strip()
-    return json.loads(raw) if raw else None
-
-
 def main() -> None:
-    payload = _read_input() or {}
-    tool_name = payload.get("tool_name", "")
-    tool_input = payload.get("tool_input") or {}
-    OUT = HookOutput(payload.get("hookEventName", "PreToolUse"))
+    raw = read_payload()
+    event = parse_payload(raw)
+    OUT = HookOutput(event.hook_event_name or "PreToolUse")
 
-    DEBUG.log("input", tool_name=tool_name, keys=list(tool_input.keys()))
+    if isinstance(event, PreToolUsePayload):
+        tool_name = event.tool_name
+        tool_input = event.tool_input
+        DEBUG.log("input", tool_name=tool_name, keys=list(tool_input.keys()))
 
-    # ... 処理 ...
+        # 書き込みアクセス制御
+        if is_write_tool(tool_name):
+            paths = get_written_paths(tool_name, tool_input)
+            # 例: sys.exit(OUT.deny(f"書き込みをブロック: {paths}"))
+
+        # 読み取りアクセス制御
+        if is_read_tool(tool_name):
+            paths = get_read_paths(tool_name, tool_input)
+            # 例: sys.exit(OUT.deny(f"読み取りをブロック: {paths}"))
 
     # 出力制御: sys.exit(OUT.method(...)) で行う。何もしない場合は return するだけ。
     # 例: sys.exit(OUT.deny("理由"))        # PreToolUse ブロック

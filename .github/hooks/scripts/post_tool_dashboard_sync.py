@@ -15,33 +15,17 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from debug_logging import HookDebugLogger
+from hook_payload import read_payload
+from tool_input import is_write_tool, get_written_paths
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PATCH_TIMEOUT_SECONDS = 30
 DEBUG = HookDebugLogger(SCRIPT_DIR, "post_tool_dashboard_sync")
 
-# Copilot tools that write files.  All others are read-only and can be skipped.
-_WRITE_TOOLS = {
-    "replace_string_in_file",
-    "create_file",
-    "multi_replace_string_in_file",
-}
-
 
 # ---------------------------------------------------------------------------
 # Pure helpers
 # ---------------------------------------------------------------------------
-
-def _read_hook_input() -> Optional[Dict]:
-    if sys.stdin.isatty():
-        return None
-    try:
-        raw = sys.stdin.read().strip()
-    except OSError:
-        return None
-    return json.loads(raw) if raw else None
-
-
 def out_json(data: Dict) -> None:
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
@@ -56,15 +40,16 @@ def _extract_changed_file(payload: Dict, workspace_path: Path) -> Optional[str]:
     tool_name: str = payload.get("tool_name") or ""
     tool_input: Dict = payload.get("tool_input") or {}
     DEBUG.log("tool_input_keys", tool_name=tool_name, keys=list(tool_input.keys()))
-    if tool_name and tool_name not in _WRITE_TOOLS:
+    if tool_name and not is_write_tool(tool_name):
         DEBUG.log("skip", reason="non-write tool", tool_name=tool_name)
         return None
-    return tool_input.get("filePath") or tool_input.get("path") or tool_input.get("file_path")
+    paths = get_written_paths(tool_name, tool_input)
+    return paths[0] if paths else None
 
 
 def _is_non_write_tool(payload: Dict) -> bool:
     tool_name: str = payload.get("tool_name") or ""
-    return bool(tool_name) and tool_name not in _WRITE_TOOLS
+    return bool(tool_name) and not is_write_tool(tool_name)
 
 
 def _is_docs_md(changed_file: str, workspace_path: Path) -> bool:
@@ -125,7 +110,7 @@ def _run_patch(cmd: List[str], workspace: str, cmd_preview: str) -> Optional[sub
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    payload = _read_hook_input() or {}
+    payload = read_payload()
     workspace = payload.get("cwd") or os.getcwd()
     workspace_path = Path(workspace)
     patch_script = workspace_path / ".github" / "scripts" / "patch_dashboard.py"

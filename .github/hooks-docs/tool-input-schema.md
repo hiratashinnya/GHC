@@ -111,6 +111,9 @@ VS Code GitHub Copilot hooks の `PreToolUse` / `PostToolUse` イベントで受
 
 ## 書き込みツールのファイルパス取得パターン（Python）
 
+> **ライブラリ化済み**: `tool_input.py` の `get_written_paths()` を使用すること。
+> 以下は参照用の実装例。
+
 ```python
 def _extract_written_paths(tool_name: str, tool_input: dict) -> list[str]:
     """書き込みツールから変更対象ファイルパスを抽出する。"""
@@ -128,4 +131,38 @@ def _extract_written_paths(tool_name: str, tool_input: dict) -> list[str]:
         fp = tool_input.get("filePath", "")
         return [fp] if fp else []
     return []
+```
+
+---
+
+## 読み取りツールのファイルパス取得パターン（Python）
+
+> **ライブラリ化済み**: `tool_input.py` の `get_read_paths()` を使用すること。
+
+```python
+def _extract_read_paths(tool_name: str, tool_input: dict) -> list[str]:
+    """読み取りツールからアクセス対象パスを抽出する。"""
+    if tool_name in ("read_file", "view_image"):
+        fp = tool_input.get("filePath", "")
+        return [fp] if fp else []
+    if tool_name == "list_dir":
+        p = tool_input.get("path", "")
+        return [p] if p else []
+    return []
+```
+
+> **注意**: `read_file` と `view_image` はともに `filePath` キーを使用する。`list_dir` は `path` キーを使用する点に注意。
+
+---
+
+## ライブラリ参照
+
+フックスクリプトからは直接 `tool_input.py` をインポートして使用すること:
+
+```python
+from tool_input import (
+    is_write_tool, get_written_paths,   # 書き込みアクセス制御
+    is_read_tool,  get_read_paths,      # 読み取りアクセス制御
+    get_command,                         # run_in_terminal コマンド取得
+)
 ```

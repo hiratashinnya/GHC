@@ -27,7 +27,7 @@ VS Code 向け GitHub Copilot エージェントフックの開発・デバッ�
 ## 関連ドキュメント
 
 | ドキュメント | 内容 |
-|---|---|
+| --- | --- |
 | [`Hooks-instructions.md`](../Hooks-instructions.md) | アーキテクチャ概要・共通フィールド・exit code 表・スパイフック |
 | [`hooks-docs/payload-PreToolUse.md`](../hooks-docs/payload-PreToolUse.md) | PreToolUse の入出力スキーマ・ブロックパターン |
 | [`hooks-docs/payload-PostToolUse.md`](../hooks-docs/payload-PostToolUse.md) | PostToolUse の入出力スキーマ・後処理パターン |
@@ -39,6 +39,8 @@ VS Code 向け GitHub Copilot エージェントフックの開発・デバッ�
 | [`hooks-docs/payload-PreCompact.md`](../hooks-docs/payload-PreCompact.md) | 圧縮前の状態保存 |
 | [`hooks-docs/tool-input-schema.md`](../hooks-docs/tool-input-schema.md) | 全ツールの tool_input スキーマ・読み書き分類表 |
 | [`hooks-docs/hook-template.md`](../hooks-docs/hook-template.md) | チェックリスト・Python テンプレート・ブロックパターン集 |
+| [`hooks/scripts/hook_payload.py`](../hooks/scripts/hook_payload.py) | `read_payload()` / `parse_payload()` / 全 8 イベント分型データクラス |
+| [`hooks/scripts/tool_input.py`](../hooks/scripts/tool_input.py) | `is_write_tool()` / `is_read_tool()` / `get_written_paths()` / `get_read_paths()` |
 
 ---
 
@@ -58,9 +60,11 @@ VS Code 向け GitHub Copilot エージェントフックの開発・デバッ�
 ## Key ポイント（よくある間違い）
 
 | 間違い | 正しい対応 |
-|---|---|
+| --- | --- |
 | `continue: false` でツール単体をブロック | `permissionDecision: "deny"` または `sys.exit(2)` を使う |
 | `stop_hook_active` を確認しない | `Stop`/`SubagentStop` では必ず確認して無限ループを防ぐ |
 | `SubagentStop` で `hookSpecificOutput.decision` を使う | `SubagentStop` はトップレベルの `decision` を使う（`Stop` と異なる） |
 | `timestamp` を整数（Unix ms）として扱う | VS Code では ISO 8601 文字列 |
 | `permissionDecision: "ask"` が動かない | VS Code のみ対応（Cloud Agent/CLI では動作しない） |
+| スクリプト内で `payload.get("tool_name")` を直接利用 | `hook_payload.py` を import し `parse_payload()` で型付きオブジェクトを取得 |
+| 読み取りアクセス制御に書き込みツール判定を流用 | `is_read_tool()` + `get_read_paths()` を使う（`tool_input.py`） |

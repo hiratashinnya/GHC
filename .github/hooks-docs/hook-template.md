@@ -38,6 +38,7 @@
 - [ ] `tool_input` の値は必ずバリデーションしてから使用する
 - [ ] ログにシークレット・パスワード・APIキーを記録しない
 - [ ] プロンプトのログを記録する場合はマスキングを施す
+- [ ] 読み取りアクセス制御が必要な場合:`tool_input.py` の `is_read_tool()` + `get_read_paths()` で対象パスを取得し `OUT.deny()` でブロック
 
 ---
 
@@ -45,6 +46,8 @@
 
 テンプレートファイル: [.github/hooks/scripts/hook-template.py](../hooks/scripts/hook-template.py)
 出力制御ライブラリ: [.github/hooks/scripts/hook_output.py](../hooks/scripts/hook_output.py)
+入力ペイロード解析ライブラリ: [.github/hooks/scripts/hook_payload.py](../hooks/scripts/hook_payload.py)
+ツール入力ライブラリ: [.github/hooks/scripts/tool_input.py](../hooks/scripts/tool_input.py)
 
 新しいスクリプトを作成する際は `hook-template.py` をコピーして使用すること。
 出力制御は `HookOutput` クラスのみを使う。`print(json.dumps(...))` や `sys.exit(2)` を直接書かないこと。
@@ -96,6 +99,21 @@ sys.exit(OUT.stop_session("セキュリティポリシー違反が検出され�
 sys.exit(OUT.warn("⚠️ 本番ファイルを編集しています。注意してください。"))
 ```
 
+### パターン F: 読み取りアクセス制御（PreToolUse）
+
+機密パスへのファイル読み取りを PreToolUse でブロックする。
+
+```python
+from tool_input import is_read_tool, get_read_paths
+
+if isinstance(event, PreToolUsePayload) and is_read_tool(event.tool_name):
+    paths = get_read_paths(event.tool_name, event.tool_input)
+    for p in paths:
+        if "/secrets/" in p or p.endswith(".env"):
+            sys.exit(OUT.deny(f"機密ファイルへの読み取りアクセスをブロックしました: {p}"))
+```
+
+> `is_write_tool()` / `get_written_paths()` の書き込み版と同一パターン。`tool_input.py` に両方が定義されている。
 > **原則**: ブロックも警告も不要な場合は何も呼ばずに `return` するだけ。`sys.exit(OUT.method(...))` を呼ぶのは何らかの出力・制御が必要な場合のみ。
 
 ---
