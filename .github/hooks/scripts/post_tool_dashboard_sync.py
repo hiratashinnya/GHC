@@ -7,7 +7,6 @@ docs/*.md file trigger an update; all other tools are skipped immediately.
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import sys
@@ -15,6 +14,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from debug_logging import HookDebugLogger
+from hook_output import HookOutput, EXIT_OK
 from hook_payload import read_payload
 from tool_input import is_write_tool, get_written_paths
 
@@ -26,9 +26,6 @@ DEBUG = HookDebugLogger(SCRIPT_DIR, "post_tool_dashboard_sync")
 # ---------------------------------------------------------------------------
 # Pure helpers
 # ---------------------------------------------------------------------------
-def out_json(data: Dict) -> None:
-    print(json.dumps(data, ensure_ascii=False, indent=2))
-
 
 def _extract_changed_file(payload: Dict, workspace_path: Path) -> Optional[str]:
     """Return the written file path when the triggering tool is a write-tool.
@@ -78,8 +75,8 @@ def _build_patch_cmd(patch_script: Path, changed_file: Optional[str], workspace_
     return cmd
 
 
-def _run_patch(cmd: List[str], workspace: str, cmd_preview: str) -> Optional[subprocess.CompletedProcess]:
-    """Run patch_dashboard.py; return CompletedProcess or None on error."""
+def _run_patch(cmd: List[str], workspace: str, cmd_preview: str, out: HookOutput) -> subprocess.CompletedProcess:
+    """Run patch_dashboard.py; return CompletedProcess or raise SystemExit on error."""
     try:
         result = subprocess.run(
             cmd, cwd=workspace, check=False,
@@ -87,19 +84,16 @@ def _run_patch(cmd: List[str], workspace: str, cmd_preview: str) -> Optional[sub
             timeout=PATCH_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired as exc:
-        DEBUG.log("timeout", cmd=cmd_preview, timeout_seconds=PATCH_TIMEOUT_SECONDS)
-        out_json({"continue": True, "systemMessage": (
+        DEBUG.log("error", cmd=cmd_preview, timeout_seconds=PATCH_TIMEOUT_SECONDS)
+        sys.exit(out.warn(
             f"Dashboard sync hook timed out. cwd={workspace}; cmd={cmd_preview}; "
             f"timeout={PATCH_TIMEOUT_SECONDS}s"
-        ), "hookSpecificOutput": {"hookEventName": "PostToolUse",
-            "additionalContext": (str(exc) or "patch_dashboard.py timed out")[-1200:]}})
-        return None
+        ))
     except OSError as exc:
-        DEBUG.log("launch_error", cmd=cmd_preview, error=str(exc))
-        out_json({"continue": True, "systemMessage": (
+        DEBUG.log("error", cmd=cmd_preview, exc=str(exc))
+        sys.exit(out.warn(
             f"Dashboard sync hook failed to launch: {exc}; cwd={workspace}; cmd={cmd_preview}"
-        )})
-        return None
+        ))
     DEBUG.log("done", returncode=result.returncode,
               stdout=result.stdout[-1000:], stderr=result.stderr[-1000:])
     return result
@@ -111,13 +105,15 @@ def _run_patch(cmd: List[str], workspace: str, cmd_preview: str) -> Optional[sub
 
 def main() -> None:
     payload = read_payload()
+    OUT = HookOutput(payload.get("hookEventName") or "PostToolUse")
     workspace = payload.get("cwd") or os.getcwd()
     workspace_path = Path(workspace)
     patch_script = workspace_path / ".github" / "scripts" / "patch_dashboard.py"
 
+    DEBUG.log("input", tool_name=payload.get("tool_name"), cwd=workspace)
+
     # Skip read-only tools immediately
     if _is_non_write_tool(payload):
-        out_json({"continue": True})
         return
 
     changed_file = _extract_changed_file(payload, workspace_path)
@@ -125,7 +121,6 @@ def main() -> None:
     # Skip writes to files outside docs/*.md
     if changed_file and not _is_docs_md(changed_file, workspace_path):
         DEBUG.log("skip", reason="not a docs/ .md file", changed_file=changed_file)
-        out_json({"continue": True})
         return
 
     cmd = _build_patch_cmd(patch_script, changed_file, workspace_path)
@@ -134,26 +129,20 @@ def main() -> None:
               changed_file=changed_file, cmd=cmd_preview)
 
     if not patch_script.is_file():
-        out_json({"continue": True, "systemMessage": (
+        sys.exit(OUT.warn(
             f"Dashboard sync hook could not find patch script. cwd={workspace}; cmd={cmd_preview}"
-        ), "hookSpecificOutput": {"hookEventName": "PostToolUse",
-            "additionalContext": f"missing script: {patch_script}"}})
-        return
+        ))
 
-    result = _run_patch(cmd, workspace, cmd_preview)
-    if result is None:
-        return  # error already reported
+    result = _run_patch(cmd, workspace, cmd_preview, OUT)
 
     if result.returncode == 0:
-        out_json({"continue": True, "hookSpecificOutput": {"hookEventName": "PostToolUse",
-            "additionalContext": "Dashboard synchronized from latest document frontmatter."}})
+        # sys.exit(OUT.add_context("Dashboard synchronized from latest document frontmatter."))
+        sys.exit(EXIT_OK) # No output, just exit 0
     else:
-        out_json({"continue": True, "systemMessage": (
+        sys.exit(OUT.warn(
             "Dashboard sync hook reported an error. "
             f"Check post_tool_dashboard_sync.debug.log. cwd={workspace}; cmd={cmd_preview}"
-        ), "hookSpecificOutput": {"hookEventName": "PostToolUse",
-            "additionalContext": (result.stderr or result.stdout or
-                                  "patch_dashboard.py returned non-zero")[-1200:]}})
+        ))
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 ---
 doc-type: dashboard
 doc-kind: master
-last-updated: "2026-04-26 22:54"
+last-updated: "2026-05-04 15:48"
 ---
 
 # プロジェクトダッシュボード

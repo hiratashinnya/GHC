@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from debug_logging import HookDebugLogger
+from hook_output import HookOutput
 from hook_payload import read_payload
 from tool_input import is_write_tool, get_written_paths
 
@@ -35,10 +36,6 @@ PHASE_TO_INDEX = {name: i + 1 for i, name in enumerate(PHASES)}
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEBUG = HookDebugLogger(SCRIPT_DIR, "check_phase_gate")
-
-
-def out_json(data: Dict) -> None:
-    print(json.dumps(data, ensure_ascii=False, indent=2))
 
 
 def _scalar(raw: str):
@@ -275,88 +272,87 @@ def main() -> None:
     ap.add_argument("--iter-dir", default="iter")
     args = ap.parse_args()
 
-    raw = read_payload()
-    tool_name = raw.get("tool_name", "")
-    tool_input = raw.get("tool_input") or {}
+    try:
+        raw = read_payload()
+        OUT = HookOutput(raw.get("hookEventName") or "PreToolUse")
+        tool_name = raw.get("tool_name", "")
+        tool_input = raw.get("tool_input") or {}
 
-    # Only gate-check write tools; read operations are always allowed.
-    if tool_name and not is_write_tool(tool_name):
-        out_json({"success": True, "blocked": False, "message": "Non-write tool skipped"})
-        return
-
-    raw_paths = get_written_paths(tool_name, tool_input) if tool_name else []
-    targets = [p.replace("\\", "/") for p in raw_paths]
-
-    # CLI and env fallbacks for manual testing.
-    fallback = resolve_target_path(args.target_path)
-    if fallback:
-        targets.append(fallback)
-
-    dedup_targets = []
-    seen_targets = set()
-    for t in targets:
-        n = t.replace("\\", "/")
-        if n not in seen_targets:
-            seen_targets.add(n)
-            dedup_targets.append(t)
-
-    DEBUG.log(
-        "start",
-        target_count=len(dedup_targets),
-        docs_dir=args.docs_dir,
-        iter_dir=args.iter_dir,
-    )
-
-    if not dedup_targets:
-        out_json({"success": True, "blocked": False, "message": "No target path provided"})
-        return
-
-    gate_docs = collect_gate_docs(Path(args.docs_dir), Path(args.iter_dir))
-
-    evaluations = []
-    blocked = False
-    for path in dedup_targets:
-        target = parse_target(path)
-        if not target:
-            continue
-        result = evaluate(target, gate_docs)
-        evaluations.append(
-            {
-                "target": target,
-                "requirements": result["requirements"],
-                "violations": result["violations"],
-                "missing_requirements": result["missing_requirements"],
-                "blocked": result["blocked"],
-            }
+        DEBUG.log(
+            "input",
+            tool_name=tool_name,
+            docs_dir=args.docs_dir,
+            iter_dir=args.iter_dir,
         )
-        blocked = blocked or result["blocked"]
 
-    if not evaluations:
-        out_json(
-            {
-                "success": True,
-                "blocked": False,
-                "message": "No docs/iter targets detected",
-                "targets": dedup_targets,
-            }
+        # Only gate-check write tools; read operations are always allowed.
+        if tool_name and not is_write_tool(tool_name):
+            return
+
+        raw_paths = get_written_paths(tool_name, tool_input) if tool_name else []
+        targets = [p.replace("\\", "/") for p in raw_paths]
+
+        # CLI and env fallbacks for manual testing.
+        fallback = resolve_target_path(args.target_path)
+        if fallback:
+            targets.append(fallback)
+
+        dedup_targets = []
+        seen_targets = set()
+        for t in targets:
+            n = t.replace("\\", "/")
+            if n not in seen_targets:
+                seen_targets.add(n)
+                dedup_targets.append(t)
+
+        if not dedup_targets:
+            return
+
+        gate_docs = collect_gate_docs(Path(args.docs_dir), Path(args.iter_dir))
+
+        evaluations = []
+        blocked = False
+        for path in dedup_targets:
+            target = parse_target(path)
+            if not target:
+                continue
+            result = evaluate(target, gate_docs)
+            evaluations.append(
+                {
+                    "target": target,
+                    "requirements": result["requirements"],
+                    "violations": result["violations"],
+                    "missing_requirements": result["missing_requirements"],
+                    "blocked": result["blocked"],
+                }
+            )
+            blocked = blocked or result["blocked"]
+
+        if not evaluations:
+            return
+
+        DEBUG.log(
+            "done",
+            blocked=blocked,
+            checked=len(evaluations),
         )
-        return
 
-    payload = {
-        "success": not blocked,
-        "blocked": blocked,
-        "evaluations": evaluations,
-    }
+        if blocked:
+            reasons: List[str] = []
+            for ev in evaluations:
+                if not ev["blocked"]:
+                    continue
+                for v in ev["violations"]:
+                    reasons.append(f"未承認: {v.get('path', '')} (status={v.get('status')})")
+                for m in ev["missing_requirements"]:
+                    reasons.append(f"要件未存在: phase={m['phase']}, process={m['process']}")
+            reason_str = "\n".join(reasons) or "フェーズゲート要件を満たしていません"
+            sys.exit(OUT.deny(reason_str))
 
-    DEBUG.log(
-        "done",
-        blocked=blocked,
-        checked=len(evaluations),
-    )
-    out_json(payload)
-
-    if blocked:
-        sys.exit(2)
+    except SystemExit:
+        raise
+    except Exception as exc:
+        DEBUG.log("error", exc=str(exc))
 
 
 if __name__ == "__main__":

@@ -15,13 +15,12 @@ Log file : .github/hooks/scripts/tool_input_spy.debug.log
 from __future__ import annotations
 
 import argparse
-import json
-import os
-import sys
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 from debug_logging import HookDebugLogger
+from hook_output import HookOutput
+from hook_payload import read_payload
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEBUG = HookDebugLogger(SCRIPT_DIR, "tool_input_spy")
@@ -38,16 +37,6 @@ def _parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def _read_stdin() -> Optional[Dict]:
-    if sys.stdin.isatty():
-        return None
-    try:
-        raw = sys.stdin.read().strip()
-    except OSError:
-        return None
-    return json.loads(raw) if raw else None
-
-
 def _sanitize(value: object, max_len: int = 300) -> object:
     """Truncate long strings to keep the log readable."""
     if isinstance(value, str) and len(value) > max_len:
@@ -61,22 +50,32 @@ def _sanitize(value: object, max_len: int = 300) -> object:
 
 def main() -> None:
     args = _parse_args()
-    payload = _read_stdin() or {}
+    try:
+        payload = read_payload()
+        OUT = HookOutput(args.event)
 
-    tool_name: str = payload.get("tool_name") or "(unknown)"
-    tool_input: Dict = payload.get("tool_input") or {}
-    tool_response: object = payload.get("tool_response")
+        tool_name: str = payload.get("tool_name") or "(unknown)"
+        tool_input: Dict = payload.get("tool_input") or {}
+        tool_response: object = payload.get("tool_response")
 
-    DEBUG.log(
-        "spy",
-        event=args.event,
-        tool_name=tool_name,
-        tool_input=_sanitize(tool_input),
-        **({} if tool_response is None else {"tool_response": _sanitize(tool_response)}),
-        input_payload=payload,  # log full payload for maximum visibility
-    )
+        DEBUG.log(
+            "input",
+            event=args.event,
+            tool_name=tool_name,
+        )
 
-    print(json.dumps({"continue": True}, ensure_ascii=False))
+        # Spy log with full tool_input and tool_response (if present).  Use a separate "spy" label to distinguish from the initial "input" log.
+        DEBUG.log(
+            "spy",
+            event=args.event,
+            tool_name=tool_name,
+            tool_input=_sanitize(tool_input),
+            **({} if tool_response is None else {"tool_response": _sanitize(tool_response)}),
+            input_payload=payload,
+        )
+        DEBUG.log("done")
+    except Exception as exc:
+        DEBUG.log("error", exc=str(exc))
 
 
 if __name__ == "__main__":
