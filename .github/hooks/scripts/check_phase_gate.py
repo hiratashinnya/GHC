@@ -267,93 +267,100 @@ def resolve_target_path(cli_target: Optional[str]) -> Optional[str]:
     return None
 
 
-def main() -> None:
+# ---------------------------------------------------------------------------
+# main() phase helpers
+# ---------------------------------------------------------------------------
+
+def _parse_input() -> tuple[PreToolUsePayload, HookOutput, argparse.Namespace]:
     ap = argparse.ArgumentParser()
     ap.add_argument("--target-path", default=None)
     ap.add_argument("--docs-dir", default="docs")
     ap.add_argument("--iter-dir", default="iter")
     args = ap.parse_args()
+    raw = read_payload()
+    event = parse_payload(raw)
+    if not isinstance(event, PreToolUsePayload):
+        event = PreToolUsePayload.from_dict(raw)
+    OUT = HookOutput(event.hook_event_name or "PreToolUse")
+    DEBUG.log("input", tool_name=event.tool_name, docs_dir=args.docs_dir, iter_dir=args.iter_dir)
+    return event, OUT, args
 
-    try:
-        raw = read_payload()
-        event = parse_payload(raw)
-        if not isinstance(event, PreToolUsePayload):
-            event = PreToolUsePayload.from_dict(raw)
-        OUT = HookOutput(event.hook_event_name or "PreToolUse")
-        tool_name = event.tool_name
-        tool_input = event.tool_input
 
-        DEBUG.log(
-            "input",
-            tool_name=tool_name,
-            docs_dir=args.docs_dir,
-            iter_dir=args.iter_dir,
+def _collect_targets(event: PreToolUsePayload, args: argparse.Namespace) -> List[str]:
+    raw_paths = get_written_paths(event.tool_name, event.tool_input) if event.tool_name else []
+    targets = [p.replace("\\", "/") for p in raw_paths]
+    fallback = resolve_target_path(args.target_path)
+    if fallback:
+        targets.append(fallback)
+    dedup: List[str] = []
+    seen: set[str] = set()
+    for t in targets:
+        n = t.replace("\\", "/")
+        if n not in seen:
+            seen.add(n)
+            dedup.append(t)
+    return dedup
+
+
+def _evaluate_targets(targets: List[str], args: argparse.Namespace) -> tuple[bool, List[Dict]]:
+    gate_docs = collect_gate_docs(Path(args.docs_dir), Path(args.iter_dir))
+    evaluations: List[Dict] = []
+    blocked = False
+    for path in targets:
+        target = parse_target(path)
+        if not target:
+            continue
+        result = evaluate(target, gate_docs)
+        evaluations.append(
+            {
+                "target": target,
+                "requirements": result["requirements"],
+                "violations": result["violations"],
+                "missing_requirements": result["missing_requirements"],
+                "blocked": result["blocked"],
+            }
         )
+        blocked = blocked or result["blocked"]
+    return blocked, evaluations
 
+
+def _build_deny_reason(evaluations: List[Dict]) -> str:
+    reasons: List[str] = []
+    for ev in evaluations:
+        if not ev["blocked"]:
+            continue
+        for v in ev["violations"]:
+            reasons.append(f"未承認: {v.get('path', '')} (status={v.get('status')})")
+        for m in ev["missing_requirements"]:
+            reasons.append(f"要件未存在: phase={m['phase']}, process={m['process']}")
+    return "\n".join(reasons) or "フェーズゲート要件を満たしていません"
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    try:
+        # 1. 入力パース
+        event, OUT, args = _parse_input()
+        # 2. Skip判定
         # Only gate-check write tools; read operations are always allowed.
-        if tool_name and not is_write_tool(tool_name):
+        if event.tool_name and not is_write_tool(event.tool_name):
+            DEBUG.log("skip", reason="non-write tool")
             return
-
-        raw_paths = get_written_paths(tool_name, tool_input) if tool_name else []
-        targets = [p.replace("\\", "/") for p in raw_paths]
-
-        # CLI and env fallbacks for manual testing.
-        fallback = resolve_target_path(args.target_path)
-        if fallback:
-            targets.append(fallback)
-
-        dedup_targets = []
-        seen_targets = set()
-        for t in targets:
-            n = t.replace("\\", "/")
-            if n not in seen_targets:
-                seen_targets.add(n)
-                dedup_targets.append(t)
-
-        if not dedup_targets:
+        # 3. ターゲット収集
+        targets = _collect_targets(event, args)
+        if not targets:
             return
-
-        gate_docs = collect_gate_docs(Path(args.docs_dir), Path(args.iter_dir))
-
-        evaluations = []
-        blocked = False
-        for path in dedup_targets:
-            target = parse_target(path)
-            if not target:
-                continue
-            result = evaluate(target, gate_docs)
-            evaluations.append(
-                {
-                    "target": target,
-                    "requirements": result["requirements"],
-                    "violations": result["violations"],
-                    "missing_requirements": result["missing_requirements"],
-                    "blocked": result["blocked"],
-                }
-            )
-            blocked = blocked or result["blocked"]
-
+        # 4. フェーズゲート評価
+        blocked, evaluations = _evaluate_targets(targets, args)
         if not evaluations:
             return
-
-        DEBUG.log(
-            "done",
-            blocked=blocked,
-            checked=len(evaluations),
-        )
-
+        DEBUG.log("done", blocked=blocked, checked=len(evaluations))
+        # 5. result処理
         if blocked:
-            reasons: List[str] = []
-            for ev in evaluations:
-                if not ev["blocked"]:
-                    continue
-                for v in ev["violations"]:
-                    reasons.append(f"未承認: {v.get('path', '')} (status={v.get('status')})")
-                for m in ev["missing_requirements"]:
-                    reasons.append(f"要件未存在: phase={m['phase']}, process={m['process']}")
-            reason_str = "\n".join(reasons) or "フェーズゲート要件を満たしていません"
-            sys.exit(OUT.deny(reason_str))
-
+            sys.exit(OUT.deny(_build_deny_reason(evaluations)))
     except SystemExit:
         raise
     except Exception as exc:
