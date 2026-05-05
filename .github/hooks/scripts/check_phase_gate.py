@@ -11,7 +11,6 @@ Output:
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 import sys
@@ -20,7 +19,7 @@ from typing import Dict, List, Optional, Tuple
 
 from debug_logging import HookDebugLogger
 from hook_output import HookOutput
-from hook_payload import read_payload
+from hook_payload import read_payload, parse_payload, PreToolUsePayload
 from tool_input import is_write_tool, get_written_paths
 
 
@@ -42,8 +41,11 @@ def _scalar(raw: str):
     s = raw.strip()
     if not s:
         return None
+    
+    # "foo" -> foo, 'bar' -> bar, but "foo -> "foo and foo" -> foo"
     if len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
         return s[1:-1]
+    
     if s in ("true", "True", "yes"):
         return True
     if s in ("false", "False", "no"):
@@ -274,9 +276,12 @@ def main() -> None:
 
     try:
         raw = read_payload()
-        OUT = HookOutput(raw.get("hookEventName") or "PreToolUse")
-        tool_name = raw.get("tool_name", "")
-        tool_input = raw.get("tool_input") or {}
+        event = parse_payload(raw)
+        if not isinstance(event, PreToolUsePayload):
+            event = PreToolUsePayload.from_dict(raw)
+        OUT = HookOutput(event.hook_event_name or "PreToolUse")
+        tool_name = event.tool_name
+        tool_input = event.tool_input
 
         DEBUG.log(
             "input",

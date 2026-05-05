@@ -11,11 +11,11 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from debug_logging import HookDebugLogger
 from hook_output import HookOutput
-from hook_payload import read_payload
+from hook_payload import read_payload, parse_payload, PostToolUsePayload
 from tool_input import is_write_tool, get_written_paths
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -27,26 +27,19 @@ DEBUG = HookDebugLogger(SCRIPT_DIR, "post_tool_dashboard_sync")
 # Pure helpers
 # ---------------------------------------------------------------------------
 
-def _extract_changed_file(payload: Dict, workspace_path: Path) -> Optional[str]:
+def _extract_changed_file(event: PostToolUsePayload, workspace_path: Path) -> Optional[str]:
     """Return the written file path when the triggering tool is a write-tool.
 
     Logs tool_input keys for debugging.  Returns None for non-write tools
     (caller should skip) and also None when the tool_input has no path key
     (caller falls back to full rebuild).
     """
-    tool_name: str = payload.get("tool_name") or ""
-    tool_input: Dict = payload.get("tool_input") or {}
-    DEBUG.log("tool_input_keys", tool_name=tool_name, keys=list(tool_input.keys()))
-    if tool_name and not is_write_tool(tool_name):
-        DEBUG.log("skip", reason="non-write tool", tool_name=tool_name)
+    DEBUG.log("tool_input_keys", tool_name=event.tool_name, keys=list(event.tool_input.keys()))
+    if event.tool_name and not is_write_tool(event.tool_name):
+        DEBUG.log("skip", reason="non-write tool", tool_name=event.tool_name)
         return None
-    paths = get_written_paths(tool_name, tool_input)
+    paths = get_written_paths(event.tool_name, event.tool_input)
     return paths[0] if paths else None
-
-
-def _is_non_write_tool(payload: Dict) -> bool:
-    tool_name: str = payload.get("tool_name") or ""
-    return bool(tool_name) and not is_write_tool(tool_name)
 
 
 def _is_docs_md(changed_file: str, workspace_path: Path) -> bool:
@@ -104,19 +97,22 @@ def _run_patch(cmd: List[str], workspace: str, cmd_preview: str, out: HookOutput
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    payload = read_payload()
-    OUT = HookOutput(payload.get("hookEventName") or "PostToolUse")
-    workspace = payload.get("cwd") or os.getcwd()
+    raw = read_payload()
+    event = parse_payload(raw)
+    if not isinstance(event, PostToolUsePayload):
+        event = PostToolUsePayload.from_dict(raw)
+    OUT = HookOutput(event.hook_event_name or "PostToolUse")
+    workspace = event.cwd or os.getcwd()
     workspace_path = Path(workspace)
     patch_script = workspace_path / ".github" / "scripts" / "patch_dashboard.py"
 
-    DEBUG.log("input", tool_name=payload.get("tool_name"), cwd=workspace)
+    DEBUG.log("input", tool_name=event.tool_name, cwd=workspace)
 
     # Skip read-only tools immediately
-    if _is_non_write_tool(payload):
+    if not is_write_tool(event.tool_name):
         return
 
-    changed_file = _extract_changed_file(payload, workspace_path)
+    changed_file = _extract_changed_file(event, workspace_path)
 
     # Skip writes to files outside docs/*.md
     if changed_file and not _is_docs_md(changed_file, workspace_path):
@@ -125,7 +121,7 @@ def main() -> None:
 
     cmd = _build_patch_cmd(patch_script, changed_file, workspace_path)
     cmd_preview = " ".join(cmd)
-    DEBUG.log("start", cwd=workspace, tool_name=payload.get("tool_name"),
+    DEBUG.log("start", cwd=workspace, tool_name=event.tool_name,
               changed_file=changed_file, cmd=cmd_preview)
 
     if not patch_script.is_file():
