@@ -1,7 +1,7 @@
 ---
 doc-type: dashboard
 doc-kind: master
-last-updated: "2026-05-04 15:48"
+last-updated: "2026-05-05 16:58"
 ---
 
 # プロジェクトダッシュボード
@@ -53,7 +53,6 @@ last-updated: "2026-05-04 15:48"
 ## ボトルネック
 
 - なし
-
 
 ## 差分ドキュメント マージ待ちリスト
 

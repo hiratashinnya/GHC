@@ -17,6 +17,7 @@ from debug_logging import HookDebugLogger
 from hook_output import HookOutput
 from hook_payload import read_payload, parse_payload, PostToolUsePayload
 from tool_input import is_write_tool, get_written_paths
+from workspace_utils import to_workspace_relative
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PATCH_TIMEOUT_SECONDS = 30
@@ -27,29 +28,18 @@ DEBUG = HookDebugLogger(SCRIPT_DIR, "post_tool_dashboard_sync")
 # Pure helpers
 # ---------------------------------------------------------------------------
 
-def _is_docs_md(changed_file: str, workspace_path: Path) -> bool:
-    """Return True iff changed_file is under docs/ and ends with .md."""
-    p = Path(changed_file) if os.path.isabs(changed_file) else workspace_path / changed_file
-    try:
-        p.resolve().relative_to((workspace_path / "docs").resolve())
-        return p.suffix.lower() == ".md"
-    except ValueError:
-        return False
+def _build_patch_cmd(patch_script: Path, changed_file: Optional[str]) -> List[str]:
+    """Build the patch_dashboard.py command list.
 
-
-def _build_patch_cmd(patch_script: Path, changed_file: Optional[str], workspace_path: Path) -> List[str]:
-    """Build the patch_dashboard.py command list."""
+    changed_file must be a workspace-relative POSIX path or None.
+    """
     cmd = [
         sys.executable, str(patch_script),
         "--docs-dir", "docs",
         "--dashboard", "docs/dashboard.md",
     ]
     if changed_file:
-        try:
-            rel = str(Path(changed_file).resolve().relative_to(workspace_path.resolve()))
-        except ValueError:
-            rel = changed_file
-        cmd += ["--changed-file", rel]
+        cmd += ["--changed-file", changed_file]
     return cmd
 
 
@@ -115,26 +105,31 @@ def _should_skip(
         return "non-write tool", None
     DEBUG.log("tool_input_keys", tool_name=event.tool_name, keys=list(event.tool_input.keys()))
     paths = get_written_paths(event.tool_name, event.tool_input)
-    changed_file = paths[0] if paths else None
-    if changed_file and not _is_docs_md(changed_file, workspace_path):
-        return "not a docs/ .md file", changed_file
+    raw_file = paths[0] if paths else None
+    if raw_file:
+        rel = to_workspace_relative(raw_file, workspace_path)
+        if rel is None or not rel.startswith("docs/") or not rel.lower().endswith(".md"):
+            return "not a docs/ .md file", raw_file
+        changed_file = rel
+    else:
+        changed_file = None
     return None, changed_file
 
 
 def _run_dashboard_update(
     patch_script: Path,
     changed_file: Optional[str],
-    workspace_path: Path,
     workspace: str,
     event: PostToolUsePayload,
     OUT: HookOutput,
 ) -> tuple[subprocess.CompletedProcess, str]:
     """Build the patch command, log it, and run patch_dashboard.py.
 
+    changed_file must be a workspace-relative POSIX path or None.
     Returns (result, cmd_preview). Raises SystemExit on timeout or OS error
     (delegated to _run_patch).
     """
-    cmd = _build_patch_cmd(patch_script, changed_file, workspace_path)
+    cmd = _build_patch_cmd(patch_script, changed_file)
     cmd_preview = " ".join(cmd)
     DEBUG.log("start", cwd=workspace, tool_name=event.tool_name,
               changed_file=changed_file, cmd=cmd_preview)
@@ -159,7 +154,7 @@ def main() -> None:
         sys.exit(OUT.warn(f"Dashboard sync hook could not find patch script. cwd={workspace}"))
     # 4. ダッシュボード更新処理
     result, cmd_preview = _run_dashboard_update(
-        patch_script, changed_file, workspace_path, workspace, event, OUT
+        patch_script, changed_file, workspace, event, OUT
     )
     # 5. result処理
     if result.returncode == 0:

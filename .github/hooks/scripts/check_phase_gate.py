@@ -21,6 +21,7 @@ from debug_logging import HookDebugLogger
 from hook_output import HookOutput
 from hook_payload import read_payload, parse_payload, PreToolUsePayload
 from tool_input import is_write_tool, get_written_paths
+from workspace_utils import to_posix, dedup_paths
 
 
 PHASES = [
@@ -104,7 +105,7 @@ def parse_frontmatter(path: Path) -> Optional[Dict]:
         data[key] = _scalar(rest)
         i += 1
 
-    data["_path"] = str(path).replace("\\", "/")
+    data["_path"] = to_posix(str(path))
     return data
 
 
@@ -118,7 +119,7 @@ def infer_process(filename: str) -> Optional[int]:
 
 
 def parse_target(target_path: str) -> Optional[Dict]:
-    p = target_path.replace("\\", "/").strip("/")
+    p = to_posix(target_path).strip("/")
     parts = p.split("/")
 
     if len(parts) >= 3 and parts[0] == "docs":
@@ -184,7 +185,7 @@ def collect_gate_docs(docs_dir: Path, iter_dir: Path) -> List[Dict]:
 
             items.append(
                 {
-                    "path": str(md).replace("\\", "/"),
+                    "path": to_posix(str(md)),
                     "phase": phase,
                     "process": process,
                     "iteration": iteration,
@@ -297,18 +298,11 @@ def _collect_targets(event: PreToolUsePayload, args: argparse.Namespace) -> List
     Returns a deduplicated list of forward-slash-normalised paths.
     """
     raw_paths = get_written_paths(event.tool_name, event.tool_input) if event.tool_name else []
-    targets = [p.replace("\\", "/") for p in raw_paths]
+    targets = list(raw_paths)
     fallback = resolve_target_path(args.target_path)
     if fallback:
         targets.append(fallback)
-    dedup: List[str] = []
-    seen: set[str] = set()
-    for t in targets:
-        n = t.replace("\\", "/")
-        if n not in seen:
-            seen.add(n)
-            dedup.append(t)
-    return dedup
+    return dedup_paths(targets)
 
 
 def _evaluate_targets(targets: List[str], args: argparse.Namespace) -> tuple[bool, List[Dict]]:
