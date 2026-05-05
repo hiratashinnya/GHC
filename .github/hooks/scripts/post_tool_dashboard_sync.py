@@ -27,21 +27,6 @@ DEBUG = HookDebugLogger(SCRIPT_DIR, "post_tool_dashboard_sync")
 # Pure helpers
 # ---------------------------------------------------------------------------
 
-def _extract_changed_file(event: PostToolUsePayload, workspace_path: Path) -> Optional[str]:
-    """Return the written file path when the triggering tool is a write-tool.
-
-    Logs tool_input keys for debugging.  Returns None for non-write tools
-    (caller should skip) and also None when the tool_input has no path key
-    (caller falls back to full rebuild).
-    """
-    DEBUG.log("tool_input_keys", tool_name=event.tool_name, keys=list(event.tool_input.keys()))
-    if event.tool_name and not is_write_tool(event.tool_name):
-        DEBUG.log("skip", reason="non-write tool", tool_name=event.tool_name)
-        return None
-    paths = get_written_paths(event.tool_name, event.tool_input)
-    return paths[0] if paths else None
-
-
 def _is_docs_md(changed_file: str, workspace_path: Path) -> bool:
     """Return True iff changed_file is under docs/ and ends with .md."""
     p = Path(changed_file) if os.path.isabs(changed_file) else workspace_path / changed_file
@@ -128,7 +113,9 @@ def _should_skip(
     """
     if not is_write_tool(event.tool_name):
         return "non-write tool", None
-    changed_file = _extract_changed_file(event, workspace_path)
+    DEBUG.log("tool_input_keys", tool_name=event.tool_name, keys=list(event.tool_input.keys()))
+    paths = get_written_paths(event.tool_name, event.tool_input)
+    changed_file = paths[0] if paths else None
     if changed_file and not _is_docs_md(changed_file, workspace_path):
         return "not a docs/ .md file", changed_file
     return None, changed_file
