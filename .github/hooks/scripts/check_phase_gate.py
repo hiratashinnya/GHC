@@ -272,6 +272,11 @@ def resolve_target_path(cli_target: Optional[str]) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def _parse_input() -> tuple[PreToolUsePayload, HookOutput, argparse.Namespace]:
+    """Parse CLI arguments and stdin payload; build HookOutput.
+
+    Returns (event, OUT, args).
+    Emits DEBUG.log("input") before returning.
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--target-path", default=None)
     ap.add_argument("--docs-dir", default="docs")
@@ -287,6 +292,10 @@ def _parse_input() -> tuple[PreToolUsePayload, HookOutput, argparse.Namespace]:
 
 
 def _collect_targets(event: PreToolUsePayload, args: argparse.Namespace) -> List[str]:
+    """Collect and deduplicate target paths from tool_input and CLI/env fallback.
+
+    Returns a deduplicated list of forward-slash-normalised paths.
+    """
     raw_paths = get_written_paths(event.tool_name, event.tool_input) if event.tool_name else []
     targets = [p.replace("\\", "/") for p in raw_paths]
     fallback = resolve_target_path(args.target_path)
@@ -303,6 +312,13 @@ def _collect_targets(event: PreToolUsePayload, args: argparse.Namespace) -> List
 
 
 def _evaluate_targets(targets: List[str], args: argparse.Namespace) -> tuple[bool, List[Dict]]:
+    """Run phase-gate evaluation for each target path.
+
+    Loads gate documents from docs/ and iter/, then evaluates each target
+    against the required gate specs.
+    Returns (blocked, evaluations) where blocked is True if any target is
+    blocked and evaluations contains per-target result dicts.
+    """
     gate_docs = collect_gate_docs(Path(args.docs_dir), Path(args.iter_dir))
     evaluations: List[Dict] = []
     blocked = False
@@ -325,6 +341,11 @@ def _evaluate_targets(targets: List[str], args: argparse.Namespace) -> tuple[boo
 
 
 def _build_deny_reason(evaluations: List[Dict]) -> str:
+    """Build a human-readable deny reason string from blocked evaluations.
+
+    Formats violations (unapproved docs) and missing requirements into
+    newline-separated lines. Falls back to a generic message when empty.
+    """
     reasons: List[str] = []
     for ev in evaluations:
         if not ev["blocked"]:

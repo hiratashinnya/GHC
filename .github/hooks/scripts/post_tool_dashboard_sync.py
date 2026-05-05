@@ -97,6 +97,11 @@ def _run_patch(cmd: List[str], workspace: str, cmd_preview: str, out: HookOutput
 # ---------------------------------------------------------------------------
 
 def _parse_input() -> tuple[PostToolUsePayload, HookOutput, str, Path, Path]:
+    """Parse stdin payload and resolve workspace context.
+
+    Returns (event, OUT, workspace, workspace_path, patch_script).
+    Emits DEBUG.log("input") before returning.
+    """
     raw = read_payload()
     event = parse_payload(raw)
     if not isinstance(event, PostToolUsePayload):
@@ -114,6 +119,13 @@ def _should_skip(
     event: PostToolUsePayload,
     workspace_path: Path,
 ) -> tuple[Optional[str], Optional[str]]:
+    """Determine whether this event should be skipped.
+
+    Returns (reason, changed_file).
+    reason is None when processing should continue; non-None string when the
+    caller should skip (e.g. "non-write tool", "not a docs/ .md file").
+    changed_file is the written path extracted from tool_input, or None.
+    """
     if not is_write_tool(event.tool_name):
         return "non-write tool", None
     changed_file = _extract_changed_file(event, workspace_path)
@@ -130,6 +142,11 @@ def _run_dashboard_update(
     event: PostToolUsePayload,
     OUT: HookOutput,
 ) -> tuple[subprocess.CompletedProcess, str]:
+    """Build the patch command, log it, and run patch_dashboard.py.
+
+    Returns (result, cmd_preview). Raises SystemExit on timeout or OS error
+    (delegated to _run_patch).
+    """
     cmd = _build_patch_cmd(patch_script, changed_file, workspace_path)
     cmd_preview = " ".join(cmd)
     DEBUG.log("start", cwd=workspace, tool_name=event.tool_name,
