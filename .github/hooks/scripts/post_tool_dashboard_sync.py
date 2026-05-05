@@ -93,10 +93,10 @@ def _run_patch(cmd: List[str], workspace: str, cmd_preview: str, out: HookOutput
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# main() phase helpers
 # ---------------------------------------------------------------------------
 
-def main() -> None:
+def _parse_input() -> tuple[PostToolUsePayload, HookOutput, str, Path, Path]:
     raw = read_payload()
     event = parse_payload(raw)
     if not isinstance(event, PostToolUsePayload):
@@ -105,32 +105,59 @@ def main() -> None:
     workspace = event.cwd or os.getcwd()
     workspace_path = Path(workspace)
     patch_script = workspace_path / ".github" / "scripts" / "patch_dashboard.py"
-
     DEBUG.log("input", tool_name=event.tool_name, cwd=workspace)
+    return event, OUT, workspace, workspace_path, patch_script
 
-    # Skip read-only tools immediately
+
+
+def _should_skip(
+    event: PostToolUsePayload,
+    workspace_path: Path,
+) -> tuple[Optional[str], Optional[str]]:
     if not is_write_tool(event.tool_name):
-        return
-
+        return "non-write tool", None
     changed_file = _extract_changed_file(event, workspace_path)
-
-    # Skip writes to files outside docs/*.md
     if changed_file and not _is_docs_md(changed_file, workspace_path):
-        DEBUG.log("skip", reason="not a docs/ .md file", changed_file=changed_file)
-        return
+        return "not a docs/ .md file", changed_file
+    return None, changed_file
 
+
+def _run_dashboard_update(
+    patch_script: Path,
+    changed_file: Optional[str],
+    workspace_path: Path,
+    workspace: str,
+    event: PostToolUsePayload,
+    OUT: HookOutput,
+) -> tuple[subprocess.CompletedProcess, str]:
     cmd = _build_patch_cmd(patch_script, changed_file, workspace_path)
     cmd_preview = " ".join(cmd)
     DEBUG.log("start", cwd=workspace, tool_name=event.tool_name,
               changed_file=changed_file, cmd=cmd_preview)
-
-    if not patch_script.is_file():
-        sys.exit(OUT.warn(
-            f"Dashboard sync hook could not find patch script. cwd={workspace}; cmd={cmd_preview}"
-        ))
-
     result = _run_patch(cmd, workspace, cmd_preview, OUT)
+    return result, cmd_preview
 
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    # 1. 入力パース
+    event, OUT, workspace, workspace_path, patch_script = _parse_input()
+    # 2. Skip判定（対象外は即時終了、I/O不要）
+    reason, changed_file = _should_skip(event, workspace_path)
+    if reason:
+        DEBUG.log("skip", reason=reason)
+        return
+    # 3. 前提条件のチェック（書き込みツールの場合のみ到達）
+    if not patch_script.is_file():
+        sys.exit(OUT.warn(f"Dashboard sync hook could not find patch script. cwd={workspace}"))
+    # 4. ダッシュボード更新処理
+    result, cmd_preview = _run_dashboard_update(
+        patch_script, changed_file, workspace_path, workspace, event, OUT
+    )
+    # 5. result処理
     if result.returncode == 0:
         return  # 何も出力しない（正常終了）
     else:
