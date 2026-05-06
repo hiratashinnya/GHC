@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import List, Optional
 
 from debug_logging import HookDebugLogger
-from hook_output import HookOutput
 from hook_payload import read_payload, parse_payload, PostToolUsePayload
 from tool_input import is_write_tool, get_written_paths
 from workspace_utils import to_workspace_relative
@@ -43,7 +42,7 @@ def _build_patch_cmd(patch_script: Path, changed_file: Optional[str]) -> List[st
     return cmd
 
 
-def _run_patch(cmd: List[str], workspace: str, cmd_preview: str, out: HookOutput) -> subprocess.CompletedProcess:
+def _run_patch(cmd: List[str], workspace: str, cmd_preview: str, out: PostToolUsePayload) -> subprocess.CompletedProcess:
     """Run patch_dashboard.py; return CompletedProcess or raise SystemExit on error."""
     try:
         result = subprocess.run(
@@ -71,22 +70,21 @@ def _run_patch(cmd: List[str], workspace: str, cmd_preview: str, out: HookOutput
 # main() phase helpers
 # ---------------------------------------------------------------------------
 
-def _parse_input() -> tuple[PostToolUsePayload, HookOutput, str, Path, Path]:
+def _parse_input() -> tuple[PostToolUsePayload, str, Path, Path]:
     """Parse stdin payload and resolve workspace context.
 
-    Returns (event, OUT, workspace, workspace_path, patch_script).
+    Returns (event, workspace, workspace_path, patch_script).
     Emits DEBUG.log("input") before returning.
     """
     raw = read_payload()
     event = parse_payload(raw)
     if not isinstance(event, PostToolUsePayload):
         event = PostToolUsePayload.from_dict(raw)
-    OUT = HookOutput(event.hook_event_name or "PostToolUse")
     workspace = event.cwd or os.getcwd()
     workspace_path = Path(workspace)
     patch_script = workspace_path / ".github" / "scripts" / "patch_dashboard.py"
     DEBUG.log("input", tool_name=event.tool_name, cwd=workspace)
-    return event, OUT, workspace, workspace_path, patch_script
+    return event, workspace, workspace_path, patch_script
 
 
 
@@ -121,7 +119,6 @@ def _run_dashboard_update(
     changed_file: Optional[str],
     workspace: str,
     event: PostToolUsePayload,
-    OUT: HookOutput,
 ) -> tuple[subprocess.CompletedProcess, str]:
     """Build the patch command, log it, and run patch_dashboard.py.
 
@@ -133,7 +130,7 @@ def _run_dashboard_update(
     cmd_preview = " ".join(cmd)
     DEBUG.log("start", cwd=workspace, tool_name=event.tool_name,
               changed_file=changed_file, cmd=cmd_preview)
-    result = _run_patch(cmd, workspace, cmd_preview, OUT)
+    result = _run_patch(cmd, workspace, cmd_preview, event)
     return result, cmd_preview
 
 
@@ -143,7 +140,7 @@ def _run_dashboard_update(
 
 def main() -> None:
     # 1. 入力パース
-    event, OUT, workspace, workspace_path, patch_script = _parse_input()
+    event, workspace, workspace_path, patch_script = _parse_input()
     # 2. Skip判定（対象外は即時終了、I/O不要）
     reason, changed_file = _should_skip(event, workspace_path)
     if reason:
@@ -151,16 +148,16 @@ def main() -> None:
         return
     # 3. 前提条件のチェック（書き込みツールの場合のみ到達）
     if not patch_script.is_file():
-        sys.exit(OUT.warn(f"Dashboard sync hook could not find patch script. cwd={workspace}"))
+        sys.exit(event.warn(f"Dashboard sync hook could not find patch script. cwd={workspace}"))
     # 4. ダッシュボード更新処理
     result, cmd_preview = _run_dashboard_update(
-        patch_script, changed_file, workspace, event, OUT
+        patch_script, changed_file, workspace, event
     )
     # 5. result処理
     if result.returncode == 0:
         return  # 何も出力しない（正常終了）
     else:
-        sys.exit(OUT.warn(
+        sys.exit(event.warn(
             "Dashboard sync hook reported an error. "
             f"Check post_tool_dashboard_sync.debug.log. cwd={workspace}; cmd={cmd_preview}"
         ))

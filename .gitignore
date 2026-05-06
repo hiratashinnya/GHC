@@ -1,3 +1,4 @@
 .github/prompts/memo.md
 .github/**/__pycache__/*
 .github/**/*.debug*
+TestHooks/*/__pycache__/*

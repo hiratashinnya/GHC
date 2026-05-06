@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import Dict
 
 from debug_logging import HookDebugLogger
-from hook_output import HookOutput
 from hook_payload import read_payload
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -52,7 +51,6 @@ def main() -> None:
     args = _parse_args()
     try:
         payload = read_payload()
-        OUT = HookOutput(args.event)
 
         tool_name: str = payload.get("tool_name") or "(unknown)"
         tool_input: Dict = payload.get("tool_input") or {}

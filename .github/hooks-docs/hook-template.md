@@ -21,17 +21,17 @@
 
 ### 出力制御
 
-- [ ] `from hook_output import HookOutput` をインポートし、`OUT = HookOutput(payload.get("hookEventName", "<EventName>"))` を初期化
-- [ ] 出力後は必ず `sys.exit(code)` を呼ぶ（`sys.exit(OUT.method(...))` の形で1行にまとめ可）
+- [ ] `from hook_payload import read_payload, parse_payload` をインポートし、`event = parse_payload(read_payload())` でイベントオブジェクトを取得
+- [ ] 出力後は必ず `sys.exit(code)` を呼ぶ（`sys.exit(event.method(...))` の形で1行にまとめ可）
 - [ ] **ブロックも警告も不要な場合**: 何も呼ばずに `return`（stdout に何も書かない）
-- [ ] **ツール単体をブロック（理由なし）**: `sys.exit(OUT.block("stderr メッセージ"))`
-- [ ] **PreToolUse でユーザーに理由を表示してブロック**: `sys.exit(OUT.deny("理由"))`
-- [ ] **ユーザー承認が必要な場合**: `sys.exit(OUT.ask("理由"))`（VS Code のみ対応）
-- [ ] **警告を表示したい場合**: `sys.exit(OUT.warn("メッセージ"))`
-- [ ] **セッション全体を停止する場合**: `sys.exit(OUT.stop_session("理由"))`
-- [ ] **PostToolUse でブロック**: `sys.exit(OUT.block_post("理由"))`
-- [ ] **コンテキストを注入**: `sys.exit(OUT.add_context("テキスト"))`
-- [ ] **ツール入力を変更（PreToolUse）**: `sys.exit(OUT.update_input(new_input_dict))`
+- [ ] **ツール単体をブロック（理由なし）**: `sys.exit(event.block("stderr メッセージ"))`
+- [ ] **PreToolUse でユーザーに理由を表示してブロック**: `sys.exit(event.deny("理由"))`
+- [ ] **ユーザー承認が必要な場合**: `sys.exit(event.ask("理由"))`（VS Code のみ対応）
+- [ ] **警告を表示したい場合**: `sys.exit(event.warn("メッセージ"))`
+- [ ] **セッション全体を停止する場合**: `sys.exit(event.stop_session("理由"))`
+- [ ] **PostToolUse でブロック**: `sys.exit(event.block_post("理由"))`
+- [ ] **コンテキストを注入**: `sys.exit(event.add_context("テキスト"))`
+- [ ] **ツール入力を変更（PreToolUse）**: `sys.exit(event.update_input(new_input_dict))`
 
 ### セキュリティ
 
@@ -45,12 +45,11 @@
 ## Python テンプレート（最小版）
 
 テンプレートファイル: [.github/hooks/scripts/hook-template.py](../hooks/scripts/hook-template.py)
-出力制御ライブラリ: [.github/hooks/scripts/hook_output.py](../hooks/scripts/hook_output.py)
-入力ペイロード解析ライブラリ: [.github/hooks/scripts/hook_payload.py](../hooks/scripts/hook_payload.py)
+ペイロード解析・出力制御ライブラリ: [.github/hooks/scripts/hook_payload.py](../hooks/scripts/hook_payload.py)
 ツール入力ライブラリ: [.github/hooks/scripts/tool_input.py](../hooks/scripts/tool_input.py)
 
 新しいスクリプトを作成する際は `hook-template.py` をコピーして使用すること。
-出力制御は `HookOutput` クラスのみを使う。`print(json.dumps(...))` や `sys.exit(2)` を直接書かないこと。
+出力制御は `event.method(...)` パターンのみを使う。`print(json.dumps(...))` や `sys.exit(2)` を直接書かないこと。
 
 > **stdout 出力の原則**: ブロックも警告も不要な場合は何も呼ばずに `return` する。
 > `sys.exit(OUT.method(...))` を呼ぶのは何らかの出力・制御が必要な場合のみ。

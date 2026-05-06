@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from debug_logging import HookDebugLogger
-from hook_output import HookOutput
 from hook_payload import read_payload, parse_payload, PreToolUsePayload
 from tool_input import is_write_tool, get_written_paths
 from workspace_utils import to_posix, dedup_paths
@@ -77,23 +76,30 @@ def parse_frontmatter(path: Path) -> Optional[Dict]:
     data: Dict = {}
     lines = m.group(1).split("\n")
     i = 0
+    
+    # Simple YAML-like frontmatter parser supporting key: value pairs and lists (key: \n  - item1\n  - item2).
     while i < len(lines):
         line = lines[i]
         s = line.strip()
+        # Skip empty lines and comments
         if not s or s.startswith("#"):
             i += 1
             continue
+        # Skip lines that don't contain a key (no colon) or are indented (list items or continuation lines)
         if line[:1].isspace() or ":" not in s:
             i += 1
             continue
 
+        # Parse key and value
         key, rest = s.split(":", 1)
         key = key.strip()
         rest = rest.strip()
 
+        # If rest is empty, check for list items in the following indented lines
         if rest == "":
             items = []
             i += 1
+            # Collect indented list items (starting with "- ") until the next non-indented line
             while i < len(lines) and lines[i][:1] in (" ", "\t"):
                 sl = lines[i].strip()
                 if sl.startswith("- "):
@@ -122,6 +128,7 @@ def parse_target(target_path: str) -> Optional[Dict]:
     p = to_posix(target_path).strip("/")
     parts = p.split("/")
 
+    # docs/phase/process.md pattern
     if len(parts) >= 3 and parts[0] == "docs":
         phase = parts[1]
         proc = infer_process(parts[-1])
@@ -135,6 +142,7 @@ def parse_target(target_path: str) -> Optional[Dict]:
                 "target_path": p,
             }
 
+    # iter/iterN/phaseM/process.md pattern
     if len(parts) >= 4 and parts[0] == "iter" and parts[1].startswith("iter") and parts[2].startswith("phase"):
         iter_raw = parts[1].replace("iter", "")
         phase_raw = parts[2].replace("phase", "")
@@ -156,6 +164,12 @@ def parse_target(target_path: str) -> Optional[Dict]:
 
 
 def collect_gate_docs(docs_dir: Path, iter_dir: Path) -> List[Dict]:
+    """
+    Collect gate documents from docs/ and iter/ directories.
+    
+    A gate document is defined as a Markdown file with frontmatter containing `approval-required: true`. The frontmatter may also include `phase`, `process`, `iteration`,
+    and `status` fields which are used for gate evaluation.
+    """
     items: List[Dict] = []
 
     for root in (docs_dir, iter_dir):
@@ -197,6 +211,13 @@ def collect_gate_docs(docs_dir: Path, iter_dir: Path) -> List[Dict]:
 
 
 def required_gate_specs(target: Dict) -> List[Tuple[str, int, Optional[int]]]:
+    """
+    Determine the required gate specs for a given target.
+    Returns a list of (phase, process, iteration) tuples that represent the gate documents that must be approved for the target to pass the phase gate.
+    The rules are:
+    - Moving into a new phase's process 1 requires previous phase process 5 approval.
+    - Process 4 and 5 require process 3 approval in the same phase.
+    """
     specs: List[Tuple[str, int, Optional[int]]] = []
     phase = target["phase"]
     phase_index = target["phase_index"]
@@ -272,10 +293,10 @@ def resolve_target_path(cli_target: Optional[str]) -> Optional[str]:
 # main() phase helpers
 # ---------------------------------------------------------------------------
 
-def _parse_input() -> tuple[PreToolUsePayload, HookOutput, argparse.Namespace]:
-    """Parse CLI arguments and stdin payload; build HookOutput.
+def _parse_input() -> tuple[PreToolUsePayload, argparse.Namespace]:
+    """Parse CLI arguments and stdin payload.
 
-    Returns (event, OUT, args).
+    Returns (event, args).
     Emits DEBUG.log("input") before returning.
     """
     ap = argparse.ArgumentParser()
@@ -287,12 +308,11 @@ def _parse_input() -> tuple[PreToolUsePayload, HookOutput, argparse.Namespace]:
     event = parse_payload(raw)
     if not isinstance(event, PreToolUsePayload):
         event = PreToolUsePayload.from_dict(raw)
-    OUT = HookOutput(event.hook_event_name or "PreToolUse")
     DEBUG.log("input", tool_name=event.tool_name, docs_dir=args.docs_dir, iter_dir=args.iter_dir)
-    return event, OUT, args
+    return event, args
 
 
-def _collect_targets(event: PreToolUsePayload, args: argparse.Namespace) -> List[str]:
+def _collect_targets(event: PreToolUsePayload, args: argparse.Namespace) -> List[str]:    
     """Collect and deduplicate target paths from tool_input and CLI/env fallback.
 
     Returns a deduplicated list of forward-slash-normalised paths.
@@ -358,7 +378,7 @@ def _build_deny_reason(evaluations: List[Dict]) -> str:
 def main() -> None:
     try:
         # 1. 入力パース
-        event, OUT, args = _parse_input()
+        event, args = _parse_input()
         # 2. Skip判定
         # Only gate-check write tools; read operations are always allowed.
         if event.tool_name and not is_write_tool(event.tool_name):
@@ -375,7 +395,7 @@ def main() -> None:
         DEBUG.log("done", blocked=blocked, checked=len(evaluations))
         # 5. result処理
         if blocked:
-            sys.exit(OUT.deny(_build_deny_reason(evaluations)))
+            sys.exit(event.deny(_build_deny_reason(evaluations)))
     except SystemExit:
         raise
     except Exception as exc:

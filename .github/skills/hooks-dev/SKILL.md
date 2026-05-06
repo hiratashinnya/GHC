@@ -21,6 +21,7 @@ Use this skill when you need to:
 
 | Document | Contents |
 |---|---|
+| [hooks-test.prompt.md](../../prompts/hooks-test.prompt.md) | Unit test suite runner & maintenance — `run_tests.ps1` commands, adding new suites, test conventions |
 | [Hooks-instructions.md](../Hooks-instructions.md) | Architecture overview, common fields, exit code table, spy hook |
 | [hooks-docs/payload-PreToolUse.md](../hooks-docs/payload-PreToolUse.md) | PreToolUse input/output schema, blocking patterns |
 | [hooks-docs/payload-PostToolUse.md](../hooks-docs/payload-PostToolUse.md) | PostToolUse input/output schema, post-processing patterns |
@@ -33,8 +34,7 @@ Use this skill when you need to:
 | [hooks-docs/tool-input-schema.md](../hooks-docs/tool-input-schema.md) | All tool_input schemas, read/write classification table |
 | [hooks-docs/hook-template.md](../hooks-docs/hook-template.md) | Full checklist, Python template, blocking pattern examples |
 | [hooks/scripts/hook_template.py](../hooks/scripts/hook_template.py) | Python hook script template with `HookOutput` usage examples |
-| [hooks/scripts/hook_output.py](../hooks/scripts/hook_output.py) | `HookOutput` class — all output control methods |
-| [hooks/scripts/hook_payload.py](../hooks/scripts/hook_payload.py) | `read_payload()`, `parse_payload()`, typed dataclasses for all 8 events |
+| [hooks/scripts/hook_payload.py](../hooks/scripts/hook_payload.py) | `read_payload()`, `parse_payload()`, typed dataclasses for all 8 events, `EXIT_OK`/`EXIT_BLOCK`, output control methods |
 | [hooks/scripts/tool_input.py](../hooks/scripts/tool_input.py) | `WRITE_TOOLS`/`READ_TOOLS`, `get_written_paths()`, `get_read_paths()` |
 
 ---
@@ -146,8 +146,9 @@ Event fires → JSON payload → stdin → Python script → stdout JSON → Cop
 6. **Choose output pattern** — from the Output Control Patterns table above
 7. **Create/update JSON config** — add event to `.github/hooks/<name>.json`
 8. **Test with spy hook** — enable `tool-spy.json` to observe raw payloads (see Hooks-instructions.md §5)
-9. **Enable debug logging** — create `<script_name>.debug` file to activate `HookDebugLogger` output
-10. **Verify exit codes** — test that exit 2 correctly blocks, exit 0 continues
+9. **Run unit tests** — use `/hooks-test` prompt or run `run_tests.ps1` directly; see [hooks-test.prompt.md](../../prompts/hooks-test.prompt.md)
+10. **Enable debug logging** — create `<script_name>.debug` file to activate `HookDebugLogger` output
+11. **Verify exit codes** — test that exit 2 correctly blocks, exit 0 continues
 
 ---
 
@@ -180,6 +181,21 @@ See [Hooks-instructions.md §5](../Hooks-instructions.md#5-スパイフックの
 # Pipe test payload to the script
 echo '{"hookEventName":"PreToolUse","tool_name":"run_in_terminal","tool_input":{"command":"rm -rf /"},"cwd":".","sessionId":"test","timestamp":"2026-01-01T00:00:00.000Z","transcript_path":"/tmp/t.jsonl","tool_use_id":"test-001"}' | python .github/hooks/scripts/<script_name>.py
 ```
+
+### Run Unit Test Suites
+
+For structured unit tests, use **[/hooks-test](../../prompts/hooks-test.prompt.md)**:
+
+```powershell
+# Run all suites
+powershell -ExecutionPolicy Bypass -File "c:\GHC\TestHooks\run_tests.ps1"
+
+# Run a single suite
+Set-Location "c:\GHC\TestHooks\<script_name>"
+python -m unittest test_<script_name> -v
+```
+
+See [hooks-test.prompt.md](../../prompts/hooks-test.prompt.md) for full command reference and how to add new test suites.
 
 ---
 
