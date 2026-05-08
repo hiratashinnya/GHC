@@ -1,0 +1,102 @@
+{
+  "description": "PreToolUse アクセス制御ルール設定。ファイル書き込み/読み込みのパス制限とコマンド実行防止を行う。",
+  "version": "1.0",
+
+  "write_rules": [
+    {
+      "id": "protect-hook-scripts",
+      "description": "Hookスクリプトへの直接書き込みを禁止する（設定変更は人間が行うこと）",
+      "action": "deny",
+      "when": {
+        "path_patterns": [
+          ".github/hooks/scripts/**",
+          ".github/hooks/config/**"
+        ]
+      }
+    },
+    {
+      "id": "confirm-docs-write",
+      "description": "docs/ 配下のドキュメントへの書き込み前に確認を求める",
+      "action": "confirm",
+      "when": {
+        "path_patterns": [
+          "docs/**"
+        ]
+      }
+    },
+    {
+      "id": "protect-iter-approved",
+      "description": "iter/ 配下への書き込み前に確認を求める",
+      "action": "confirm",
+      "when": {
+        "path_patterns": [
+          "iter/**"
+        ]
+      }
+    }
+  ],
+
+  "read_rules": [
+    {
+      "id": "deny-env-files",
+      "description": "環境変数ファイル（.env 系）の読み取りを禁止する",
+      "action": "deny",
+      "when": {
+        "path_patterns": [
+          "**/.env",
+          "**/.env.*",
+          "**/secrets/**",
+          "**/.secrets/**"
+        ]
+      }
+    }
+  ],
+
+  "command_rules": [
+    {
+      "id": "block-destructive-delete",
+      "description": "ファイル/ディレクトリの強制削除コマンドをブロックする",
+      "action": "deny",
+      "when": {
+        "command_patterns": [
+          "rm -rf",
+          "rm -fr",
+          "rd /s /q",
+          "Remove-Item -Recurse -Force"
+        ]
+      }
+    },
+    {
+      "id": "block-disk-format",
+      "description": "ディスクフォーマットコマンドをブロックする",
+      "action": "deny",
+      "when": {
+        "command_patterns": [
+          "format ",
+          "diskpart"
+        ]
+      }
+    },
+    {
+      "id": "confirm-git-force-push",
+      "description": "Git の強制プッシュ前に確認を求める",
+      "action": "confirm",
+      "when": {
+        "command_patterns": [
+          "git push --force",
+          "git push -f "
+        ]
+      }
+    },
+    {
+      "id": "confirm-git-reset-hard",
+      "description": "git reset --hard 前に確認を求める",
+      "action": "confirm",
+      "when": {
+        "command_patterns": [
+          "git reset --hard"
+        ]
+      }
+    }
+  ]
+}
