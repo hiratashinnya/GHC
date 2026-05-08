@@ -8,9 +8,9 @@
 
 | テストID | 観点 | 入力 | 期待動作 |
 |----------|------|------|----------|
-| WU-001 | `to_posix` バックスラッシュ変換 | `"docs\\basic-design\\x.md"` | `"docs/basic-design/x.md"` を返す |
-| WU-002 | `to_posix` POSIX済みパス（変換不要） | `"docs/basic-design/x.md"` | そのまま `"docs/basic-design/x.md"` を返す |
-| WU-003 | `to_posix` 空文字 | `""` | `""` を返す |
+| WU-001 | `norm` バックスラッシュ変換 | `"docs\\basic-design\\x.md"` | `"docs/basic-design/x.md"` を返す |
+| WU-002 | `norm` POSIX済みパス（変換不要） | `"docs/basic-design/x.md"` | そのまま `"docs/basic-design/x.md"` を返す |
+| WU-003 | `norm` 空文字 | `""` | `""` を返す |
 | WU-004 | `to_workspace_relative` ワークスペース内の絶対パス | workspace 配下の絶対パス | ワークスペース相対 POSIX 文字列を返す |
 | WU-005 | `to_workspace_relative` ワークスペース相対パス | `"docs/x.md"` + workspace_path | `"docs/x.md"` を返す |
 | WU-006 | `to_workspace_relative` ワークスペース外のパス | workspace 外の絶対パス | `None` を返す |

@@ -10,8 +10,9 @@
 
 出力:
     エクスポートされるシンボル:
-      _config 由来             : PHASES, PHASE_INDEX, PHASE_LABEL, PROC_FILE,
-                                  DD_OVERVIEW, DD_VALIDATION, STATUS_EMOJI, NOT_STARTED
+      _config 由来             : PHASES, PHASE_TO_INDEX, PHASE_LABEL, PROC_FILE,
+                                  DD_OVERVIEW, DD_VALIDATION, STATUS_EMOJI, NOT_STARTED,
+                                  PROCESS_NAMES
       _debug 由来              : is_debug, debug_log
       _io 由来                 : read_text, write_text, norm, out_json, out_err
       _frontmatter 由来        : parse_fm, scan_fm, update_fm, add_tags, append_changelog

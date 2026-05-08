@@ -10,8 +10,8 @@
 
 出力:
     インポートした変数で参照する:
-    PHASES, PHASE_INDEX, PHASE_LABEL, PROC_FILE, DD_OVERVIEW, DD_VALIDATION,
-    STATUS_EMOJI, NOT_STARTED
+    PHASES, PHASE_TO_INDEX, PHASE_LABEL, PROC_FILE, DD_OVERVIEW, DD_VALIDATION,
+    STATUS_EMOJI, NOT_STARTED, PROCESS_NAMES
 
 副作用:
     なし (定数定義のみ)。
@@ -25,7 +25,7 @@ PHASES = [
     "implementation", "testing", "release",
 ]
 
-PHASE_INDEX = {p: i for i, p in enumerate(PHASES)}
+PHASE_TO_INDEX = {p: i + 1 for i, p in enumerate(PHASES)}
 
 PHASE_LABEL = {
     "requirements": "要件定義",
@@ -55,6 +55,15 @@ DD_OVERVIEW = {
 }
 
 DD_VALIDATION = "02-breakdown-validation.md"
+
+# Process number → canonical process name
+PROCESS_NAMES = {
+    1: "validation",
+    2: "breakdown",
+    3: "decisions",
+    4: "artifact",
+    5: "verification",
+}
 
 STATUS_EMOJI = {
     "approved":          "✅",

@@ -11,19 +11,20 @@ from pathlib import Path
 SCRIPTS_DIR = Path(r"c:\GHC\.github\hooks\scripts")
 sys.path.insert(0, str(SCRIPTS_DIR))
 
-from workspace_utils import to_posix, to_workspace_relative, is_under_dir, dedup_paths
+from workspace_utils import to_workspace_relative, is_under_dir, dedup_paths
+from _lib._io import norm
 
 
-class TestToPosix(unittest.TestCase):
+class TestNorm(unittest.TestCase):
 
     def test_WU001_backslash_conversion(self):
-        self.assertEqual(to_posix("docs\\basic-design\\x.md"), "docs/basic-design/x.md")
+        self.assertEqual(norm("docs\\basic-design\\x.md"), "docs/basic-design/x.md")
 
     def test_WU002_already_posix(self):
-        self.assertEqual(to_posix("docs/basic-design/x.md"), "docs/basic-design/x.md")
+        self.assertEqual(norm("docs/basic-design/x.md"), "docs/basic-design/x.md")
 
     def test_WU003_empty_string(self):
-        self.assertEqual(to_posix(""), "")
+        self.assertEqual(norm(""), "")
 
 
 class TestToWorkspaceRelative(unittest.TestCase):

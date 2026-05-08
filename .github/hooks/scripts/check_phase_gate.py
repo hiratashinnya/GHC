@@ -18,26 +18,9 @@ from typing import Any, Dict, List, Optional
 from debug_logging import HookDebugLogger
 from hook_payload import read_payload, parse_payload, PreToolUsePayload
 from tool_input import is_write_tool, get_written_paths
-from workspace_utils import to_posix, dedup_paths
-
-
-PHASES = [
-    "requirements",
-    "basic-design",
-    "detailed-design",
-    "implementation",
-    "testing",
-    "release",
-]
-PHASE_TO_INDEX = {name: i + 1 for i, name in enumerate(PHASES)}
-
-PROCESS_NAMES = {
-    1: "validation",
-    2: "breakdown",
-    3: "decisions",
-    4: "artifact",
-    5: "verification",
-}
+from workspace_utils import dedup_paths
+from _lib._config import PHASES, PHASE_TO_INDEX, PROCESS_NAMES
+from _lib._io import norm
 # process=4 専用サフィックス。variant 抽出時に compId と区別するために除去する。
 ARTIFACT_SUBTYPES = {"api", "domain", "schema", "testcase"}
 
@@ -206,7 +189,7 @@ def parse_frontmatter(path: Path) -> Optional[Dict[str, Any]]:
         data[key] = _scalar(rest)
         i += 1
 
-    data["_path"] = to_posix(str(path))
+    data["_path"] = norm(path)
     return data
 
 
@@ -307,7 +290,7 @@ def parse_write_target(target_path: str) -> Optional[WorkflowDocument]:
       docs/detailed-design/components/{compId}/0N-name-{compId}.md
       iter/iter{N}/phase{M}/0N-name{-variant}.md
     """
-    p = to_posix(target_path).strip("/")
+    p = norm(target_path).strip("/")
     parts = p.split("/")
     if parts[0] == "docs":
         return _parse_docs_target(parts, p)
@@ -332,9 +315,9 @@ def _find_gate_file(scope: str, gate_id: WorkflowIdentifier) -> Optional[str]:
 
     # fallback (variant なしファイル) を先に確認
     if fallback and Path(fallback).exists():
-        return to_posix(fallback)
+        return norm(fallback)
     for hit in sorted(Path(".").glob(pattern)):
-        return to_posix(str(hit))
+        return norm(hit)
     return None
 
 

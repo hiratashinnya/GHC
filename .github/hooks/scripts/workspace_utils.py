@@ -7,7 +7,7 @@ used freely in Skip-checks and other hot paths.
 
 Typical usage::
 
-    from workspace_utils import to_posix, to_workspace_relative, is_under_dir, dedup_paths
+    from workspace_utils import to_workspace_relative, is_under_dir, dedup_paths
 
     rel = to_workspace_relative(raw_path, workspace_path)
     if rel and is_under_dir(raw_path, "docs", workspace_path):
@@ -16,16 +16,15 @@ Typical usage::
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import List, Optional
 
+_LIB_DIR = Path(__file__).resolve().parent.parent.parent / "scripts"
+if str(_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(_LIB_DIR))
 
-def to_posix(path: str) -> str:
-    """Normalize backslashes to forward slashes.
-
-    Safe to call on paths that already use forward slashes (no-op).
-    """
-    return path.replace("\\", "/")
+from _lib._io import norm  # noqa: E402
 
 
 def to_workspace_relative(path: str, workspace_path: Path) -> Optional[str]:
@@ -51,8 +50,8 @@ def is_under_dir(path: str, subdir: str, workspace_path: Path) -> bool:
     rel = to_workspace_relative(path, workspace_path)
     if rel is None:
         return False
-    norm = to_posix(subdir).rstrip("/")
-    return rel == norm or rel.startswith(norm + "/")
+    prefix = norm(subdir).rstrip("/")
+    return rel == prefix or rel.startswith(prefix + "/")
 
 
 def dedup_paths(paths: List[str]) -> List[str]:
@@ -65,7 +64,7 @@ def dedup_paths(paths: List[str]) -> List[str]:
     seen: set[str] = set()
     result: List[str] = []
     for p in paths:
-        key = to_posix(p)
+        key = norm(p)
         if key not in seen:
             seen.add(key)
             result.append(key)

@@ -1,9 +1,9 @@
 # testresult: workspace_utils.py
 
 対象スクリプト: `.github/hooks/scripts/workspace_utils.py`
-実行日: 2026-05-05
-コミットID: 32ed3c0
-実行コマンド: `python -m unittest test_workspace_utils -v`
+実行日: 2026-05-08
+コミットID: d8db764 (未コミット変更あり: _lib 一元管理統合)
+実行コマンド: `python -m unittest TestHooks/workspace_utils/test_workspace_utils.py -v`
 総合結果: **PASS** (16/16)
 
 ---
@@ -12,9 +12,9 @@
 
 | テストID | 観点 | 入力 | 期待動作 | 結果 | 判定 |
 |----------|------|------|----------|------|------|
-| WU-001 | `to_posix` バックスラッシュ変換 | `"docs\\basic-design\\x.md"` | `"docs/basic-design/x.md"` を返す | `"docs/basic-design/x.md"` | PASS |
-| WU-002 | `to_posix` POSIX済みパス（変換不要） | `"docs/basic-design/x.md"` | そのまま `"docs/basic-design/x.md"` を返す | `"docs/basic-design/x.md"` | PASS |
-| WU-003 | `to_posix` 空文字 | `""` | `""` を返す | `""` | PASS |
+| WU-001 | `norm` バックスラッシュ変換 | `"docs\\basic-design\\x.md"` | `"docs/basic-design/x.md"` を返す | `"docs/basic-design/x.md"` | PASS |
+| WU-002 | `norm` POSIX済みパス（変換不要） | `"docs/basic-design/x.md"` | そのまま `"docs/basic-design/x.md"` を返す | `"docs/basic-design/x.md"` | PASS |
+| WU-003 | `norm` 空文字 | `""` | `""` を返す | `""` | PASS |
 | WU-004 | `to_workspace_relative` ワークスペース内の絶対パス | workspace 配下の絶対パス | ワークスペース相対 POSIX 文字列を返す | `"docs/x.md"` | PASS |
 | WU-005 | `to_workspace_relative` ワークスペース相対パス | `"docs/x.md"` + workspace_path | `"docs/x.md"` を返す | `"docs/x.md"` | PASS |
 | WU-006 | `to_workspace_relative` ワークスペース外のパス | workspace 外の絶対パス | `None` を返す | `None` | PASS |

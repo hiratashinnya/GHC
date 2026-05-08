@@ -2,7 +2,7 @@
 
 対象スクリプト: `.github/hooks/scripts/check_phase_gate.py`
 実行日: 2026-05-08
-コミットID: d374ce7 (未コミット変更あり: parse_write_target をスコープ別関数に分割)
+コミットID: d8db764 (未コミット変更あり: _lib 一元管理統合)
 実行コマンド: `python -m unittest TestHooks/check_phase_gate/test_check_phase_gate.py -v`
 総合結果: **PASS** (39/39)
 

@@ -20,7 +20,7 @@
 import os
 from pathlib import Path
 
-from ._config import DD_OVERVIEW, PROC_FILE, PHASES
+from ._config import DD_OVERVIEW, PROC_FILE, PHASES, PHASE_TO_INDEX
 from ._io import norm
 
 
@@ -154,7 +154,7 @@ def classify_changed_file(changed_file, docs="docs"):
     if phase not in PHASES:
         return None
 
-    phase_idx = PHASES.index(phase) + 1
+    phase_idx = PHASE_TO_INDEX[phase]
 
     comp_id = None
     if phase == "detailed-design" and len(parts) >= 3 and parts[1] == "components":
