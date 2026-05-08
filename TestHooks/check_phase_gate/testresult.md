@@ -1,40 +1,53 @@
 # testresult: check_phase_gate.py
 
 対象スクリプト: `.github/hooks/scripts/check_phase_gate.py`
-実行日: 2026-05-05
-コミットID: 32ed3c0
-実行コマンド: `python -m unittest test_check_phase_gate -v`
-総合結果: **PASS** (26/26)
+実行日: 2026-05-08
+コミットID: d374ce7 (未コミット変更あり: parse_write_target をスコープ別関数に分割)
+実行コマンド: `python -m unittest TestHooks/check_phase_gate/test_check_phase_gate.py -v`
+総合結果: **PASS** (39/39)
 
 ---
 
 ## テスト結果
 
-| テストID | 観点 | 入力 | 期待動作 | 結果 | 判定 |
-|----------|------|------|----------|------|------|
-| CG-001 | `_scalar` 通常文字列 | `"hello"` | `"hello"` を返す | `"hello"` | PASS |
-| CG-002 | `_scalar` bool 真 | `"true"` | `True` を返す | `True` | PASS |
-| CG-003 | `_scalar` bool 偽 | `"false"` | `False` を返す | `False` | PASS |
-| CG-004 | `_scalar` null | `"null"` | `None` を返す | `None` | PASS |
-| CG-005 | `_scalar` 整数 | `"5"` | `5` を返す | `5` | PASS |
-| CG-006 | `_scalar` クォート付き文字列 | `'"foo"'` | `"foo"` を返す（クォート除去） | `"foo"` | PASS |
-| CG-007 | `_scalar` 空文字列 | `""` | `None` を返す | `None` | PASS |
-| CG-008 | `parse_frontmatter` 正常なフロントマター有り | `approval-required: true` などを含む `.md` ファイル | フィールドを含む dict を返す | `{"approval-required": True, "status": "approved", ...}` | PASS |
-| CG-009 | `parse_frontmatter` フロントマターなし | 通常のテキストのみの `.md` ファイル | `None` を返す | `None` | PASS |
-| CG-010 | `parse_frontmatter` 存在しないパス | 読み取り不能なパス | `None` を返す | `None` | PASS |
-| CG-011 | `infer_process` `01-` プレフィックス | `"01-validation.md"` | `1` を返す | `1` | PASS |
-| CG-012 | `infer_process` `05-` プレフィックス（複合名） | `"05-verification-comp.md"` | `5` を返す | `5` | PASS |
-| CG-013 | `infer_process` 不一致ファイル名 | `"README.md"` | `None` を返す | `None` | PASS |
-| CG-014 | `parse_target` docs パス（相対 POSIX） | `"docs/basic-design/01-validation.md"` | `scope:"docs"`, `phase:"basic-design"`, `process:1` を返す | 全フィールド一致 | PASS |
-| CG-015 | `parse_target` iter パス | `"iter/iter2/phase3/04-artifact.md"` | `scope:"iter"`, `phase:"detailed-design"`, `process:4`, `iteration:2` を返す | 全フィールド一致 | PASS |
-| CG-016 | `parse_target` Windows バックスラッシュ | `"docs\\basic-design\\01-validation.md"` | CG-014 と同一の結果を返す | CG-014 と一致 | PASS |
-| CG-017 | `parse_target` 不正パス（docs 外） | `"src/foo.py"` | `None` を返す | `None` | PASS |
-| CG-018 | `required_gate_specs` process=1 かつ phase_index>1 | `process=1, phase_index=2` | 前フェーズ process=5 の spec が含まれる | `[("requirements", 5, 0)]` | PASS |
-| CG-019 | `required_gate_specs` process>=4 | `process=4, phase="basic-design"` | 同フェーズ process=3 の spec が含まれる | `[("basic-design", 3, 0)]` | PASS |
-| CG-020 | `required_gate_specs` 要件なし | `process=2, phase_index=1` | specs が空リスト `[]` になる | `[]` | PASS |
-| CG-021 | `evaluate` ゲートドキュメント不在（missing） | gate_docs が空リスト | `blocked=True`, `missing_requirements` に要件情報が含まれる | `blocked=True`, `missing_requirements` 有り | PASS |
-| CG-022 | `evaluate` ゲートドキュメント未承認（violation） | `status="draft"` のゲートドキュメント有り | `blocked=True`, `violations` に該当ドキュメントが含まれる | `blocked=True`, `violations` 有り | PASS |
-| CG-023 | `evaluate` ゲートドキュメント承認済み | `status="approved"` のゲートドキュメント有り | `blocked=False`, `violations` と `missing_requirements` が空 | `blocked=False`, 両リスト空 | PASS |
-| CG-024 | `collect_gate_docs` dashboard.md 除外 | `dashboard.md` を含むフォルダを走査 | 結果リストに dashboard.md が含まれない | dashboard.md 不在 | PASS |
-| CG-025 | `collect_gate_docs` approval-required フィルタ | `approval-required: true` / `false` 混在フォルダ | `true` のドキュメントのみ収集される | true のみ 1 件 | PASS |
-| CG-026 | `collect_gate_docs` 空ディレクトリ | docs/iter ディレクトリが空の状態 | 空リスト `[]` を返す | `[]` | PASS |
+| テストID | クラス | 観点 | 結果 | 判定 |
+|----------|--------|------|------|------|
+| CG-001 | TestScalar | `_scalar` 通常文字列 | `"hello"` | PASS |
+| CG-002 | TestScalar | `_scalar` bool 真 | `True` | PASS |
+| CG-003 | TestScalar | `_scalar` bool 偽 | `False` | PASS |
+| CG-004 | TestScalar | `_scalar` null | `None` | PASS |
+| CG-005 | TestScalar | `_scalar` 整数 | `5` | PASS |
+| CG-006 | TestScalar | `_scalar` クォート付き文字列 | `"foo"` | PASS |
+| CG-007 | TestScalar | `_scalar` 空文字列 | `None` | PASS |
+| CG-008 | TestParseFrontmatter | 正常なフロントマター | dict 返却 | PASS |
+| CG-009 | TestParseFrontmatter | フロントマターなし | `None` | PASS |
+| CG-010 | TestParseFrontmatter | 存在しないパス | `None` | PASS |
+| CG-011 | TestInferProcess | `01-` プレフィックス | `1` | PASS |
+| CG-012 | TestInferProcess | `05-` 複合名 | `5` | PASS |
+| CG-013 | TestInferProcess | 不一致 | `None` | PASS |
+| CG-014 | TestExtractVariant | variant なし | `None` | PASS |
+| CG-015 | TestExtractVariant | overview variant | `"overview"` | PASS |
+| CG-016 | TestExtractVariant | compId variant | `"auth"` | PASS |
+| CG-017 | TestExtractVariant | artifact サブタイプ除去 | `"auth"` | PASS |
+| CG-018 | TestExtractVariant | artifact サブタイプなし | `"auth"` | PASS |
+| CG-019 | TestParseWriteTarget | docs 単純パス | scope/phase/process 一致 | PASS |
+| CG-020 | TestParseWriteTarget | docs overview | variant="overview" | PASS |
+| CG-021 | TestParseWriteTarget | docs components | variant="auth" | PASS |
+| CG-022 | TestParseWriteTarget | iter パス | scope="iter", iteration=2 | PASS |
+| CG-023 | TestParseWriteTarget | Windows バックスラッシュ | POSIX 版と一致 | PASS |
+| CG-024 | TestParseWriteTarget | 不正パス | `None` | PASS |
+| CG-025 | TestPrecedingGates | process=1, phase>1 | 前フェーズ proc=5 が含まれる | PASS |
+| CG-026 | TestPrecedingGates | process=4, variant なし | 同フェーズ proc=3 のみ | PASS |
+| CG-027 | TestPrecedingGates | process=4, compId variant | variant 版 + overview 版の両方 | PASS |
+| CG-028 | TestPrecedingGates | ゲートなし条件 | 空リスト | PASS |
+| CG-029 | TestExpectedPath | docs 単純 | 正規パス文字列 | PASS |
+| CG-030 | TestExpectedPath | docs overview | `-overview` サフィックス | PASS |
+| CG-031 | TestExpectedPath | docs compId | components/ サブディレクトリ | PASS |
+| CG-032 | TestExpectedPath | iter | iter/iterN/phaseM/ パス | PASS |
+| CG-033 | TestCheckGateCompliance | ゲート不要（requirements proc=2） | blocked=False | PASS |
+| CG-034 | TestCheckGateCompliance | ゲートファイル不在 | blocked=True, missing=1 | PASS |
+| CG-035 | TestCheckGateCompliance | ゲート承認済み | blocked=False | PASS |
+| CG-036 | TestCheckGateCompliance | ゲート未承認（draft） | blocked=True, violations=1 | PASS |
+| CG-037 | TestCheckGateCompliance | 命名規則違反（glob 検出） | blocked=True, naming_violations=1 | PASS |
+| CG-038 | TestCheckGateCompliance | compId: variant+overview 両方承認 | blocked=False | PASS |
+| CG-039 | TestCheckGateCompliance | compId: overview 不在 | blocked=True, missing に "overview" | PASS |

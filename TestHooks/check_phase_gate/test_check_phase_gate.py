@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 import textwrap
@@ -14,12 +15,15 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 from check_phase_gate import (
     _scalar,
+    _extract_variant,
     parse_frontmatter,
     infer_process,
-    parse_target,
-    required_gate_specs,
-    evaluate,
-    collect_gate_docs,
+    parse_write_target,
+    check_gate_compliance,
+    WorkflowIdentifier,
+    WorkflowDocument,
+    GateCheckResult,
+    PROCESS_NAMES,
 )
 
 
@@ -98,169 +102,221 @@ class TestInferProcess(unittest.TestCase):
         self.assertIsNone(infer_process("README.md"))
 
 
-class TestParseTarget(unittest.TestCase):
+class TestExtractVariant(unittest.TestCase):
 
-    def test_CG014_docs_posix_path(self):
-        result = parse_target("docs/basic-design/01-validation.md")
-        self.assertIsNotNone(result)
-        self.assertEqual(result["scope"], "docs")
-        self.assertEqual(result["phase"], "basic-design")
-        self.assertEqual(result["process"], 1)
+    def test_CG014_no_variant(self):
+        self.assertIsNone(_extract_variant("03-decisions.md", 3))
 
-    def test_CG015_iter_path(self):
-        result = parse_target("iter/iter2/phase3/04-artifact.md")
-        self.assertIsNotNone(result)
-        self.assertEqual(result["scope"], "iter")
-        self.assertEqual(result["phase"], "detailed-design")
-        self.assertEqual(result["process"], 4)
-        self.assertEqual(result["iteration"], 2)
+    def test_CG015_overview_variant(self):
+        self.assertEqual(_extract_variant("03-decisions-overview.md", 3), "overview")
 
-    def test_CG016_windows_backslash(self):
-        a = parse_target("docs/basic-design/01-validation.md")
-        b = parse_target("docs\\basic-design\\01-validation.md")
+    def test_CG016_comp_id_variant(self):
+        self.assertEqual(_extract_variant("03-decisions-auth.md", 3), "auth")
+
+    def test_CG017_artifact_subtype_stripped(self):
+        # "04-artifact-auth-api.md" → variant は "auth"（api を除去）
+        self.assertEqual(_extract_variant("04-artifact-auth-api.md", 4), "auth")
+
+    def test_CG018_artifact_no_subtype(self):
+        self.assertEqual(_extract_variant("04-artifact-auth.md", 4), "auth")
+
+
+class TestParseWriteTarget(unittest.TestCase):
+
+    def test_CG019_docs_simple(self):
+        doc = parse_write_target("docs/basic-design/01-validation.md")
+        self.assertIsNotNone(doc)
+        self.assertEqual(doc.scope, "docs")
+        self.assertEqual(doc.idx.phase, "basic-design")
+        self.assertEqual(doc.idx.process, 1)
+        self.assertIsNone(doc.idx.variant)
+
+    def test_CG020_docs_overview(self):
+        doc = parse_write_target("docs/detailed-design/03-decisions-overview.md")
+        self.assertIsNotNone(doc)
+        self.assertEqual(doc.idx.phase, "detailed-design")
+        self.assertEqual(doc.idx.process, 3)
+        self.assertEqual(doc.idx.variant, "overview")
+
+    def test_CG021_docs_components(self):
+        doc = parse_write_target("docs/detailed-design/components/auth/04-artifact-auth.md")
+        self.assertIsNotNone(doc)
+        self.assertEqual(doc.scope, "docs")
+        self.assertEqual(doc.idx.phase, "detailed-design")
+        self.assertEqual(doc.idx.process, 4)
+        self.assertEqual(doc.idx.variant, "auth")
+
+    def test_CG022_iter_path(self):
+        doc = parse_write_target("iter/iter2/phase3/04-artifact.md")
+        self.assertIsNotNone(doc)
+        self.assertEqual(doc.scope, "iter")
+        self.assertEqual(doc.idx.phase, "detailed-design")
+        self.assertEqual(doc.idx.process, 4)
+        self.assertEqual(doc.idx.iteration, 2)
+
+    def test_CG023_windows_backslash(self):
+        a = parse_write_target("docs/basic-design/01-validation.md")
+        b = parse_write_target("docs\\basic-design\\01-validation.md")
         self.assertEqual(a, b)
 
-    def test_CG017_invalid_path(self):
-        self.assertIsNone(parse_target("src/foo.py"))
+    def test_CG024_invalid_path(self):
+        self.assertIsNone(parse_write_target("src/foo.py"))
 
 
-class TestRequiredGateSpecs(unittest.TestCase):
+class TestPrecedingGates(unittest.TestCase):
 
-    def _make_target(self, phase, phase_index, process, scope="docs", iteration=0):
-        return {
-            "scope": scope,
-            "phase": phase,
-            "phase_index": phase_index,
-            "process": process,
-            "iteration": iteration,
-            "target_path": f"docs/{phase}/0{process}-x.md",
-        }
+    def _make_idx(self, phase, phase_index, process, iteration=0, variant=None):
+        from check_phase_gate import PHASES
+        return WorkflowIdentifier(phase=phase, process=process, iteration=iteration, variant=variant)
 
-    def test_CG018_process1_phase_index_gt1(self):
-        target = self._make_target("basic-design", 2, 1)
-        specs = required_gate_specs(target)
-        # 前フェーズ (requirements) の process 5 が必要
-        self.assertIn(("requirements", 5, 0), specs)
+    def test_CG025_process1_phase_gt1(self):
+        idx = self._make_idx("basic-design", 2, 1)
+        gates = idx.preceding_gates()
+        self.assertIn(
+            WorkflowIdentifier("requirements", 5, 0, None),
+            gates,
+        )
 
-    def test_CG019_process_ge4(self):
-        target = self._make_target("basic-design", 2, 4)
-        specs = required_gate_specs(target)
-        # 同フェーズ process 3 が必要
-        self.assertIn(("basic-design", 3, 0), specs)
+    def test_CG026_process4_no_variant(self):
+        idx = self._make_idx("basic-design", 2, 4)
+        gates = idx.preceding_gates()
+        self.assertIn(WorkflowIdentifier("basic-design", 3, 0, None), gates)
+        # overview が追加されないこと
+        self.assertNotIn(WorkflowIdentifier("basic-design", 3, 0, "overview"), gates)
 
-    def test_CG020_no_requirements(self):
-        target = self._make_target("requirements", 1, 2)
-        specs = required_gate_specs(target)
-        self.assertEqual(specs, [])
+    def test_CG027_process4_comp_id(self):
+        idx = WorkflowIdentifier("detailed-design", 4, 0, "auth")
+        gates = idx.preceding_gates()
+        # variant 版と overview 版の両方が必要
+        self.assertIn(WorkflowIdentifier("detailed-design", 3, 0, "auth"), gates)
+        self.assertIn(WorkflowIdentifier("detailed-design", 3, 0, "overview"), gates)
 
-
-class TestEvaluate(unittest.TestCase):
-
-    def _make_target(self, phase="basic-design", phase_index=2, process=1, iteration=0):
-        return {
-            "scope": "docs",
-            "phase": phase,
-            "phase_index": phase_index,
-            "process": process,
-            "iteration": iteration,
-            "target_path": f"docs/{phase}/0{process}-x.md",
-        }
-
-    def test_CG021_missing_requirement(self):
-        target = self._make_target()  # phase_index=2, process=1 → 前フェーズproc5必須
-        result = evaluate(target, [])
-        self.assertTrue(result["blocked"])
-        self.assertEqual(result["violations"], [])
-        self.assertEqual(result["missing_requirements"],  [{'phase': 'requirements', 'process': 5, 'iteration': 0}])
-        self.assertGreaterEqual(len(result["requirements"]), 1)  # 要件ドキュメントの情報も返す
-
-    def test_CG022_violation_unapproved(self):
-        target = self._make_target()
-        gate_docs = [{
-            "path": "docs/requirements/05-verification.md",
-            "phase": "requirements",
-            "process": 5,
-            "iteration": 0,
-            "status": "draft",  # 未承認
-        }]
-        result = evaluate(target, gate_docs)
-        self.assertTrue(result["blocked"])
-        self.assertEqual(result["violations"], gate_docs)  # 要件ドキュメントが違反として返る
-        self.assertEqual(result["missing_requirements"], [])
-        self.assertGreaterEqual(len(result["requirements"]), 1)  # 要件ドキュメントの情報も返す
-
-    def test_CG023_approved(self):
-        target = self._make_target()
-        gate_docs = [{
-            "path": "docs/requirements/05-verification.md",
-            "phase": "requirements",
-            "process": 5,
-            "iteration": 0,
-            "status": "approved",
-        }]
-        result = evaluate(target, gate_docs)
-        self.assertFalse(result["blocked"])
-        self.assertEqual(result["violations"], [])
-        self.assertEqual(result["missing_requirements"], [])
-        self.assertGreaterEqual(len(result["requirements"]), 1)  # 要件ドキュメントの情報も返す
+    def test_CG028_no_gates(self):
+        idx = WorkflowIdentifier("requirements", 1, 2, None)  # process=1, phase index=1
+        self.assertEqual(idx.preceding_gates(), [])
 
 
-class TestCollectGateDocs(unittest.TestCase):
+class TestExpectedPath(unittest.TestCase):
+
+    def test_CG029_docs_simple(self):
+        doc = WorkflowDocument(
+            scope="docs",
+            idx=WorkflowIdentifier("basic-design", 3, 0, None),
+            path=None,
+        )
+        self.assertEqual(doc._expected_path(), "docs/basic-design/03-decisions.md")
+
+    def test_CG030_docs_overview(self):
+        doc = WorkflowDocument(
+            scope="docs",
+            idx=WorkflowIdentifier("detailed-design", 3, 0, "overview"),
+            path=None,
+        )
+        self.assertEqual(doc._expected_path(), "docs/detailed-design/03-decisions-overview.md")
+
+    def test_CG031_docs_comp_id(self):
+        doc = WorkflowDocument(
+            scope="docs",
+            idx=WorkflowIdentifier("detailed-design", 3, 0, "auth"),
+            path=None,
+        )
+        self.assertEqual(
+            doc._expected_path(),
+            "docs/detailed-design/components/auth/03-decisions-auth.md",
+        )
+
+    def test_CG032_iter(self):
+        doc = WorkflowDocument(
+            scope="iter",
+            idx=WorkflowIdentifier("detailed-design", 5, 2, None),
+            path=None,
+        )
+        self.assertEqual(doc._expected_path(), "iter/iter2/phase3/05-verification.md")
+
+
+class TestCheckGateCompliance(unittest.TestCase):
+    """check_gate_compliance() の統合テスト。tmpdir に実ファイルを作成して検証する。"""
 
     def setUp(self):
         self._tmpdir = tempfile.TemporaryDirectory()
-        self.tmppath = Path(self._tmpdir.name)
-        self.docs_dir = self.tmppath / "docs"
-        self.iter_dir = self.tmppath / "iter"
-        self.docs_dir.mkdir()
-        self.iter_dir.mkdir()
+        self._orig_cwd = os.getcwd()
+        os.chdir(self._tmpdir.name)
 
     def tearDown(self):
+        os.chdir(self._orig_cwd)
         self._tmpdir.cleanup()
 
-    def _write_md(self, rel_path: str, content: str):
-        p = self.tmppath / rel_path
+    def _write_md(self, rel_path: str, status: str = "approved"):
+        p = Path(rel_path)
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(textwrap.dedent(content), encoding="utf-8")
-        return p
-
-    def test_CG024_excludes_dashboard(self):
-        self._write_md("docs/dashboard.md", """\
+        p.write_text(textwrap.dedent(f"""\
             ---
             approval-required: true
-            status: approved
-            phase: requirements
-            process: 5
+            status: {status}
             ---
-        """)
-        result = collect_gate_docs(self.docs_dir, self.iter_dir)
-        paths = [r["path"] for r in result]
-        self.assertFalse(any("dashboard.md" in p for p in paths))
+        """), encoding="utf-8")
 
-    def test_CG025_approval_required_filter(self):
-        self._write_md("docs/requirements/05-verification.md", """\
-            ---
-            approval-required: true
-            status: approved
-            phase: requirements
-            process: 5
-            ---
-        """)
-        self._write_md("docs/requirements/03-decisions.md", """\
-            ---
-            approval-required: false
-            status: approved
-            phase: requirements
-            process: 3
-            ---
-        """)
-        result = collect_gate_docs(self.docs_dir, self.iter_dir)
-        self.assertEqual(len(result), 1)
-        self.assertIn("05-verification.md", result[0]["path"])
+    def test_CG033_no_gates_required(self):
+        # requirements phase process=2 → 直前ゲートなし
+        target = parse_write_target("docs/requirements/02-breakdown.md")
+        result = check_gate_compliance(target)
+        self.assertFalse(result.blocked)
 
-    def test_CG026_empty_directory(self):
-        result = collect_gate_docs(self.docs_dir, self.iter_dir)
-        self.assertEqual(result, [])
+    def test_CG034_missing_gate(self):
+        # basic-design process=1 → requirements/05-verification.md が必要
+        target = parse_write_target("docs/basic-design/01-validation.md")
+        result = check_gate_compliance(target)
+        self.assertTrue(result.blocked)
+        self.assertEqual(len(result.missing), 1)
+        self.assertEqual(result.missing[0].idx.phase, "requirements")
+        self.assertEqual(result.missing[0].idx.process, 5)
+
+    def test_CG035_approved_gate(self):
+        self._write_md("docs/requirements/05-verification.md", "approved")
+        target = parse_write_target("docs/basic-design/01-validation.md")
+        result = check_gate_compliance(target)
+        self.assertFalse(result.blocked)
+
+    def test_CG036_unapproved_gate(self):
+        self._write_md("docs/requirements/05-verification.md", "draft")
+        target = parse_write_target("docs/basic-design/01-validation.md")
+        result = check_gate_compliance(target)
+        self.assertTrue(result.blocked)
+        self.assertEqual(len(result.violations), 1)
+        self.assertEqual(result.violations[0].idx.process, 5)
+
+    def test_CG037_naming_violation(self):
+        # 期待パスとは別名でゲートファイルが存在する
+        self._write_md("docs/requirements/05-verification-extra.md", "approved")
+        target = parse_write_target("docs/basic-design/01-validation.md")
+        result = check_gate_compliance(target)
+        self.assertTrue(result.blocked)
+        self.assertEqual(len(result.naming_violations), 1)
+
+    def test_CG038_comp_id_both_gates_approved(self):
+        # detailed-design の comp=auth, process=4 → decisions-auth + decisions-overview が必要
+        self._write_md("docs/detailed-design/components/auth/03-decisions-auth.md", "approved")
+        self._write_md("docs/detailed-design/03-decisions-overview.md", "approved")
+        target = WorkflowDocument(
+            scope="docs",
+            idx=WorkflowIdentifier("detailed-design", 4, 0, "auth"),
+            path="docs/detailed-design/components/auth/04-artifact-auth.md",
+        )
+        result = check_gate_compliance(target)
+        self.assertFalse(result.blocked)
+
+    def test_CG039_comp_id_overview_missing(self):
+        self._write_md("docs/detailed-design/components/auth/03-decisions-auth.md", "approved")
+        # overview は意図的に作らない
+        target = WorkflowDocument(
+            scope="docs",
+            idx=WorkflowIdentifier("detailed-design", 4, 0, "auth"),
+            path="docs/detailed-design/components/auth/04-artifact-auth.md",
+        )
+        result = check_gate_compliance(target)
+        self.assertTrue(result.blocked)
+        missing_variants = [m.idx.variant for m in result.missing]
+        self.assertIn("overview", missing_variants)
 
 
 if __name__ == "__main__":

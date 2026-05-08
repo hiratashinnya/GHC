@@ -215,3 +215,16 @@ See [hooks-test.prompt.md](../../prompts/hooks-test.prompt.md) for full command 
 | JSON output with `ensure_ascii=True` (default) | Always use `ensure_ascii=False` for Japanese characters |
 | Using `payload.get("tool_name")` directly in new scripts | Import `hook_payload` and use `parse_payload()` for typed access |
 | Blocking a `read_file` with write-tool logic | Use `is_read_tool()` + `get_read_paths()` — separate from write-tool path |
+
+---
+
+## testresult.md の記録ルール
+
+テスト実行後に `testresult.md` を更新する際は、以下を必ず守ること。
+
+| フィールド | 取得方法 |
+|---|---|
+| `実行日:` | セッションコンテキストに表示されている **現在日付** を使用する（過去の日付やハードコード値は禁止） |
+| `コミットID:` | `git log --oneline -1` を実行して取得する |
+
+> **注意**: 日付を推測・ハードコードしないこと。コンテキストに "The current date is YYYY年MM月DD日" と明示されているので、それを参照する。

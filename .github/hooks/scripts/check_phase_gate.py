@@ -2,10 +2,7 @@
 """H-1: check-phase-gate - block writes when required gate docs are not approved.
 
 Usage:
-  python .github/hooks/scripts/check_phase_gate.py [--target-path <path>] [--docs-dir docs] [--iter-dir iter]
-
-Output:
-  JSON { success, blocked, target, violations, missing_requirements }
+  python .github/hooks/scripts/check_phase_gate.py [--target-path <path>]
 """
 
 from __future__ import annotations
@@ -14,8 +11,9 @@ import argparse
 import os
 import re
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from debug_logging import HookDebugLogger
 from hook_payload import read_payload, parse_payload, PreToolUsePayload
@@ -33,8 +31,105 @@ PHASES = [
 ]
 PHASE_TO_INDEX = {name: i + 1 for i, name in enumerate(PHASES)}
 
+PROCESS_NAMES = {
+    1: "validation",
+    2: "breakdown",
+    3: "decisions",
+    4: "artifact",
+    5: "verification",
+}
+# process=4 専用サフィックス。variant 抽出時に compId と区別するために除去する。
+ARTIFACT_SUBTYPES = {"api", "domain", "schema", "testcase"}
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEBUG = HookDebugLogger(SCRIPT_DIR, "check_phase_gate")
+
+
+@dataclass
+class WorkflowIdentifier:
+    """フェーズワークフロー内のドキュメント座標。"""
+    phase: str
+    process: int
+    iteration: int
+    variant: Optional[str]  # None | "overview" | "{compId}" | "iterN" など
+
+    def preceding_gates(self) -> List[WorkflowIdentifier]:
+        """このドキュメントを書き込む前に承認されていなければならないゲートの座標リストを返す。
+
+        Rules:
+        - process==1 かつ phase_index>1: 前フェーズの process 5 が必要。
+        - process>=4 かつ variant が compId (None/"overview" 以外):
+            同フェーズ process 3 の variant 版と overview 版の両方が必要。
+        - process>=4 それ以外: 同フェーズ process 3 の同 variant が必要。
+        """
+        gates: List[WorkflowIdentifier] = []
+        phase_index = PHASE_TO_INDEX.get(self.phase, 0)
+
+        if self.process == 1 and phase_index > 1:
+            prev_phase = PHASES[phase_index - 2]
+            gates.append(WorkflowIdentifier(
+                phase=prev_phase, process=5, iteration=self.iteration, variant=None
+            ))
+
+        if self.process >= 4:
+            is_comp_id = self.variant is not None and self.variant != "overview"
+            gates.append(WorkflowIdentifier(
+                phase=self.phase, process=3, iteration=self.iteration, variant=self.variant
+            ))
+            if is_comp_id:
+                gates.append(WorkflowIdentifier(
+                    phase=self.phase, process=3, iteration=self.iteration, variant="overview"
+                ))
+
+        return gates
+
+
+@dataclass
+class WorkflowDocument:
+    """フェーズワークフロー内の実ドキュメント。"""
+    scope: str                # "docs" | "iter"
+    idx: WorkflowIdentifier
+    path: Optional[str]       # None = ファイルが存在しない
+
+    def exists(self) -> bool:
+        return self.path is not None
+
+    def _expected_path(self) -> str:
+        """命名規則に基づく期待パスを返す。"""
+        name = PROCESS_NAMES[self.idx.process]
+        suffix = f"-{self.idx.variant}" if self.idx.variant else ""
+        phase_idx = PHASE_TO_INDEX.get(self.idx.phase, 0)
+
+        if self.scope == "iter":
+            return f"iter/iter{self.idx.iteration}/phase{phase_idx}/0{self.idx.process}-{name}{suffix}.md"
+
+        # docs scope
+        if (
+            self.idx.phase == "detailed-design"
+            and self.idx.variant is not None
+            and self.idx.variant != "overview"
+        ):
+            # compId あり → components/{compId}/ サブディレクトリ
+            return f"docs/detailed-design/components/{self.idx.variant}/0{self.idx.process}-{name}-{self.idx.variant}.md"
+
+        return f"docs/{self.idx.phase}/0{self.idx.process}-{name}{suffix}.md"
+
+    def approved(self) -> bool:
+        """フロントマターの status が "approved" であるか確認する。"""
+        if not self.path:
+            return False
+        fm = parse_frontmatter(Path(self.path))
+        return bool(fm and fm.get("status") == "approved")
+
+
+@dataclass
+class GateCheckResult:
+    """1件の WorkflowDocument に対するゲートチェック結果。"""
+    target: WorkflowDocument
+    blocked: bool
+    violations: List[WorkflowDocument]         # 存在するが未承認
+    missing: List[WorkflowDocument]            # ファイルが存在しない
+    naming_violations: List[WorkflowDocument]  # glob で発見したが命名規則違反
 
 
 def _scalar(raw: str):
@@ -63,7 +158,7 @@ def _scalar(raw: str):
     return s
 
 
-def parse_frontmatter(path: Path) -> Optional[Dict]:
+def parse_frontmatter(path: Path) -> Optional[Dict[str, Any]]:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
@@ -73,7 +168,7 @@ def parse_frontmatter(path: Path) -> Optional[Dict]:
     if not m:
         return None
 
-    data: Dict = {}
+    data: Dict[str, Any] = {}
     lines = m.group(1).split("\n")
     i = 0
     
@@ -124,151 +219,157 @@ def infer_process(filename: str) -> Optional[int]:
     return int(m.group(1))
 
 
-def parse_target(target_path: str) -> Optional[Dict]:
+def _extract_variant(filename: str, process: int) -> Optional[str]:
+    """ファイル名からvariantを抽出する。
+
+    e.g. "03-decisions-overview.md" -> "overview"
+         "04-artifact-auth-api.md"  -> "auth"  (ARTIFACT_SUBTYPESを除去)
+         "01-validation.md"         -> None
+    """
+    name = PROCESS_NAMES.get(process, "")
+    # prefix: "0N-name-" を除いた残り
+    prefix = f"0{process}-{name}-"
+    if not filename.startswith(prefix) or not filename.endswith(".md"):
+        return None
+    rest = filename[len(prefix):-3]  # .md を除く
+    if not rest:
+        return None
+    # process=4 のサブタイプ（api/domain/schema/testcase）を末尾から除去
+    if process == 4:
+        parts = rest.rsplit("-", 1)
+        if len(parts) == 2 and parts[1] in ARTIFACT_SUBTYPES:
+            rest = parts[0]
+    return rest if rest else None
+
+
+def _parse_docs_target(parts: list, p: str) -> Optional[WorkflowDocument]:
+    """docs/ パスを解析して WorkflowDocument を返す。"""
+    if len(parts) < 3:
+        return None
+    phase = parts[1]
+    if phase not in PHASE_TO_INDEX:
+        return None
+
+    # docs/detailed-design/components/{compId}/0N-name-{compId}.md
+    if phase == "detailed-design" and len(parts) >= 5 and parts[2] == "components":
+        comp_id = parts[3]
+        proc = infer_process(parts[-1])
+        if proc is None:
+            return None
+        return WorkflowDocument(
+            scope="docs",
+            idx=WorkflowIdentifier(phase=phase, process=proc, iteration=0, variant=comp_id),
+            path=p,
+        )
+
+    # docs/{phase}/0N-name{-variant}.md
+    proc = infer_process(parts[-1])
+    if proc is None:
+        return None
+    return WorkflowDocument(
+        scope="docs",
+        idx=WorkflowIdentifier(phase=phase, process=proc, iteration=0, variant=_extract_variant(parts[-1], proc)),
+        path=p,
+    )
+
+
+def _parse_iter_target(parts: list, p: str) -> Optional[WorkflowDocument]:
+    """iter/ パスを解析して WorkflowDocument を返す。"""
+    if len(parts) < 4 or not parts[1].startswith("iter") or not parts[2].startswith("phase"):
+        return None
+    iter_raw = parts[1][4:]
+    phase_raw = parts[2][5:]
+    if not iter_raw.isdigit() or not phase_raw.isdigit():
+        return None
+    phase_index = int(phase_raw)
+    if not (1 <= phase_index <= len(PHASES)):
+        return None
+    proc = infer_process(parts[-1])
+    if proc is None:
+        return None
+    return WorkflowDocument(
+        scope="iter",
+        idx=WorkflowIdentifier(
+            phase=PHASES[phase_index - 1],
+            process=proc,
+            iteration=int(iter_raw),
+            variant=_extract_variant(parts[-1], proc),
+        ),
+        path=p,
+    )
+
+
+def parse_write_target(target_path: str) -> Optional[WorkflowDocument]:
+    """書き込みパスを解析して WorkflowDocument を返す。
+
+    対応パターン:
+      docs/{phase}/0N-name{-variant}.md
+      docs/detailed-design/components/{compId}/0N-name-{compId}.md
+      iter/iter{N}/phase{M}/0N-name{-variant}.md
+    """
     p = to_posix(target_path).strip("/")
     parts = p.split("/")
-
-    # docs/phase/process.md pattern
-    if len(parts) >= 3 and parts[0] == "docs":
-        phase = parts[1]
-        proc = infer_process(parts[-1])
-        if phase in PHASE_TO_INDEX and proc is not None:
-            return {
-                "scope": "docs",
-                "phase": phase,
-                "phase_index": PHASE_TO_INDEX[phase],
-                "process": proc,
-                "iteration": 0,
-                "target_path": p,
-            }
-
-    # iter/iterN/phaseM/process.md pattern
-    if len(parts) >= 4 and parts[0] == "iter" and parts[1].startswith("iter") and parts[2].startswith("phase"):
-        iter_raw = parts[1].replace("iter", "")
-        phase_raw = parts[2].replace("phase", "")
-        proc = infer_process(parts[-1])
-        if iter_raw.isdigit() and phase_raw.isdigit() and proc is not None:
-            phase_index = int(phase_raw)
-            if 1 <= phase_index <= len(PHASES):
-                phase = PHASES[phase_index - 1]
-                return {
-                    "scope": "iter",
-                    "phase": phase,
-                    "phase_index": phase_index,
-                    "process": proc,
-                    "iteration": int(iter_raw),
-                    "target_path": p,
-                }
-
+    if parts[0] == "docs":
+        return _parse_docs_target(parts, p)
+    if parts[0] == "iter":
+        return _parse_iter_target(parts, p)
     return None
 
 
-def collect_gate_docs(docs_dir: Path, iter_dir: Path) -> List[Dict]:
-    """
-    Collect gate documents from docs/ and iter/ directories.
-    
-    A gate document is defined as a Markdown file with frontmatter containing `approval-required: true`. The frontmatter may also include `phase`, `process`, `iteration`,
-    and `status` fields which are used for gate evaluation.
-    """
-    items: List[Dict] = []
+def _find_gate_file(scope: str, gate_id: WorkflowIdentifier) -> Optional[str]:
+    """ゲート座標に対応するファイルを glob で検索する（命名規則違反検出用）。"""
+    name = PROCESS_NAMES.get(gate_id.process, "")
+    if scope == "iter":
+        phase_idx = PHASE_TO_INDEX.get(gate_id.phase, 0)
+        pattern = f"iter/iter{gate_id.iteration}/phase{phase_idx}/0{gate_id.process}-{name}-*.md"
+        fallback = f"iter/iter{gate_id.iteration}/phase{phase_idx}/0{gate_id.process}-{name}.md"
+    elif gate_id.phase == "detailed-design" and gate_id.variant not in (None, "overview"):
+        pattern = f"docs/detailed-design/components/{gate_id.variant}/0{gate_id.process}-{name}-*.md"
+        fallback = None
+    else:
+        pattern = f"docs/{gate_id.phase}/0{gate_id.process}-{name}-*.md"
+        fallback = f"docs/{gate_id.phase}/0{gate_id.process}-{name}.md"
 
-    for root in (docs_dir, iter_dir):
-        if not root.exists():
-            continue
-        for md in sorted(root.rglob("*.md")):
-            if md.name == "dashboard.md":
-                continue
-            fm = parse_frontmatter(md)
-            if not fm:
-                continue
-            if fm.get("approval-required") is not True:
-                continue
-
-            phase = fm.get("phase")
-            process = fm.get("process")
-            iteration = fm.get("iteration")
-
-            try:
-                process = int(process) if process is not None else None
-            except ValueError:
-                process = None
-            try:
-                iteration = int(iteration) if iteration is not None else 0
-            except ValueError:
-                iteration = 0
-
-            items.append(
-                {
-                    "path": to_posix(str(md)),
-                    "phase": phase,
-                    "process": process,
-                    "iteration": iteration,
-                    "status": fm.get("status"),
-                }
-            )
-
-    return items
+    # fallback (variant なしファイル) を先に確認
+    if fallback and Path(fallback).exists():
+        return to_posix(fallback)
+    for hit in sorted(Path(".").glob(pattern)):
+        return to_posix(str(hit))
+    return None
 
 
-def required_gate_specs(target: Dict) -> List[Tuple[str, int, Optional[int]]]:
-    """
-    Determine the required gate specs for a given target.
-    Returns a list of (phase, process, iteration) tuples that represent the gate documents that must be approved for the target to pass the phase gate.
-    The rules are:
-    - Moving into a new phase's process 1 requires previous phase process 5 approval.
-    - Process 4 and 5 require process 3 approval in the same phase.
-    """
-    specs: List[Tuple[str, int, Optional[int]]] = []
-    phase = target["phase"]
-    phase_index = target["phase_index"]
-    process = target["process"]
-    iteration = target["iteration"]
+def check_gate_compliance(target: WorkflowDocument) -> GateCheckResult:
+    """target の直前ゲートをチェックして GateCheckResult を返す。"""
+    violations: List[WorkflowDocument] = []
+    missing: List[WorkflowDocument] = []
+    naming_violations: List[WorkflowDocument] = []
 
-    # Moving into a new phase's process 1 requires previous phase process 5 approval.
-    if process == 1 and phase_index > 1:
-        prev_phase = PHASES[phase_index - 2]
-        prev_iter = iteration if target["scope"] == "iter" else 0
-        specs.append((prev_phase, 5, prev_iter))
+    for gate_id in target.idx.preceding_gates():
+        gate_doc = WorkflowDocument(scope=target.scope, idx=gate_id, path=None)
+        expected = gate_doc._expected_path()
 
-    # Process 4 and 5 require process 3 approval in the same phase.
-    if process >= 4:
-        req_iter = iteration if target["scope"] == "iter" else 0
-        specs.append((phase, 3, req_iter))
+        if Path(expected).exists():
+            gate_doc.path = expected
+            if not gate_doc.approved():
+                violations.append(gate_doc)
+        else:
+            # 期待パスが存在しない → glob で別のファイルを探す
+            found = _find_gate_file(target.scope, gate_id)
+            if found:
+                # 命名規則違反（別名で存在）
+                gate_doc.path = found
+                naming_violations.append(gate_doc)
+            else:
+                missing.append(gate_doc)
 
-    return specs
-
-
-def evaluate(target: Dict, gate_docs: List[Dict]) -> Dict:
-    specs = required_gate_specs(target)
-    violations = []
-    missing = []
-
-    for phase, process, iteration in specs:
-        matches = [
-            g
-            for g in gate_docs
-            if g.get("phase") == phase
-            and g.get("process") == process
-            and (iteration is None or g.get("iteration") == iteration)
-        ]
-
-        if not matches:
-            missing.append({"phase": phase, "process": process, "iteration": iteration})
-            continue
-
-        for g in matches:
-            if g.get("status") != "approved":
-                violations.append(g)
-
-    blocked = bool(violations or missing)
-    return {
-        "blocked": blocked,
-        "violations": violations,
-        "missing_requirements": missing,
-        "requirements": [
-            {"phase": p, "process": pr, "iteration": it} for p, pr, it in specs
-        ],
-    }
+    blocked = bool(violations or missing or naming_violations)
+    return GateCheckResult(
+        target=target,
+        blocked=blocked,
+        violations=violations,
+        missing=missing,
+        naming_violations=naming_violations,
+    )
 
 
 def resolve_target_path(cli_target: Optional[str]) -> Optional[str]:
@@ -294,21 +395,15 @@ def resolve_target_path(cli_target: Optional[str]) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def _parse_input() -> tuple[PreToolUsePayload, argparse.Namespace]:
-    """Parse CLI arguments and stdin payload.
-
-    Returns (event, args).
-    Emits DEBUG.log("input") before returning.
-    """
+    """Parse CLI arguments and stdin payload."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--target-path", default=None)
-    ap.add_argument("--docs-dir", default="docs")
-    ap.add_argument("--iter-dir", default="iter")
     args = ap.parse_args()
     raw = read_payload()
     event = parse_payload(raw)
     if not isinstance(event, PreToolUsePayload):
         event = PreToolUsePayload.from_dict(raw)
-    DEBUG.log("input", tool_name=event.tool_name, docs_dir=args.docs_dir, iter_dir=args.iter_dir)
+    DEBUG.log("input", tool_name=event.tool_name)
     return event, args
 
 
@@ -325,49 +420,32 @@ def _collect_targets(event: PreToolUsePayload, args: argparse.Namespace) -> List
     return dedup_paths(targets)
 
 
-def _evaluate_targets(targets: List[str], args: argparse.Namespace) -> tuple[bool, List[Dict]]:
-    """Run phase-gate evaluation for each target path.
-
-    Loads gate documents from docs/ and iter/, then evaluates each target
-    against the required gate specs.
-    Returns (blocked, evaluations) where blocked is True if any target is
-    blocked and evaluations contains per-target result dicts.
-    """
-    gate_docs = collect_gate_docs(Path(args.docs_dir), Path(args.iter_dir))
-    evaluations: List[Dict] = []
+def _evaluate_targets(targets: List[str], args: argparse.Namespace) -> tuple[bool, List[GateCheckResult]]:
+    """各書き込みターゲットに対してゲートチェックを実行する。"""
+    results: List[GateCheckResult] = []
     blocked = False
     for path in targets:
-        target = parse_target(path)
+        target = parse_write_target(path)
         if not target:
             continue
-        result = evaluate(target, gate_docs)
-        evaluations.append(
-            {
-                "target": target,
-                "requirements": result["requirements"],
-                "violations": result["violations"],
-                "missing_requirements": result["missing_requirements"],
-                "blocked": result["blocked"],
-            }
-        )
-        blocked = blocked or result["blocked"]
-    return blocked, evaluations
+        result = check_gate_compliance(target)
+        results.append(result)
+        blocked = blocked or result.blocked
+    return blocked, results
 
 
-def _build_deny_reason(evaluations: List[Dict]) -> str:
-    """Build a human-readable deny reason string from blocked evaluations.
-
-    Formats violations (unapproved docs) and missing requirements into
-    newline-separated lines. Falls back to a generic message when empty.
-    """
+def _build_deny_reason(results: List[GateCheckResult]) -> str:
+    """ブロック理由を人間が読める文字列で返す。"""
     reasons: List[str] = []
-    for ev in evaluations:
-        if not ev["blocked"]:
+    for r in results:
+        if not r.blocked:
             continue
-        for v in ev["violations"]:
-            reasons.append(f"未承認: {v.get('path', '')} (status={v.get('status')})")
-        for m in ev["missing_requirements"]:
-            reasons.append(f"要件未存在: phase={m['phase']}, process={m['process']}")
+        for v in r.violations:
+            reasons.append(f"未承認: {v.path} (status 未承認)")
+        for m in r.missing:
+            reasons.append(f"ゲート未存在: {m._expected_path()}")
+        for n in r.naming_violations:
+            reasons.append(f"命名規則違反: {n.path} (期待: {n._expected_path()})")
     return "\n".join(reasons) or "フェーズゲート要件を満たしていません"
 
 
@@ -389,13 +467,13 @@ def main() -> None:
         if not targets:
             return
         # 4. フェーズゲート評価
-        blocked, evaluations = _evaluate_targets(targets, args)
-        if not evaluations:
+        blocked, results = _evaluate_targets(targets, args)
+        if not results:
             return
-        DEBUG.log("done", blocked=blocked, checked=len(evaluations))
+        DEBUG.log("done", blocked=blocked, checked=len(results))
         # 5. result処理
         if blocked:
-            sys.exit(event.deny(_build_deny_reason(evaluations)))
+            sys.exit(event.deny(_build_deny_reason(results)))
     except SystemExit:
         raise
     except Exception as exc:
