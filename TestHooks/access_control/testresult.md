@@ -3,9 +3,9 @@
 対象スクリプト: `.github/hooks/scripts/access_control.py`
 関連モジュール: `ac_config_loader.py`, `ac_rule_engine.py`
 実行日: 2026-05-09
-コミットID: e219d7d (未コミット変更あり: RuleGroup 対応、multi-level enable/disable、get_group() 追加)
-実行コマンド: `python -m unittest TestHooks/access_control/test_access_control.py -v`
-総合結果: **PASS** (39/39)
+コミットID: f952387
+実行コマンド: `python -m unittest test_access_control -v`
+総合結果: **PASS** (51/51)
 
 ---
 
@@ -52,18 +52,18 @@
 | AC-071 | TestGetGroup | `get_group("read")` → read_rules を返す | `rules[0].rule_id == "r2"` | PASS |
 | AC-072 | TestGetGroup | `get_group("command")` → command_rules を返す | `rules[0].rule_id == "r3"` | PASS |
 | AC-073 | TestGetGroup | `get_group` 未知タイプ → 空 RuleGroup | `RuleGroup(rules=[])` | PASS |
-| AC-080 | TestBuildConfigWarning | `skipped_rules` 空 → `""` | - | 未実施 |
-| AC-081 | TestBuildConfigWarning | `skipped_rules` あり → `"⚠"` で始まる文字列 | - | 未実施 |
-| AC-082 | TestLoadConfigOrExit | FileNotFoundError → event.warn() + sys.exit(0) | - | 未実施 |
-| AC-083 | TestLoadConfigOrExit | Exception → event.warn() + sys.exit(0) | - | 未実施 |
-| AC-084 | TestLoadConfigOrExit | 正常読み込み → config を返す | - | 未実施 |
-| AC-085 | TestDispatchAction | result=None + warning='' → sys.exit なし | - | 未実施 |
-| AC-086 | TestDispatchAction | result=None + warning あり → sys.exit(warn) | - | 未実施 |
-| AC-087 | TestDispatchAction | action='deny' → sys.exit(2) | - | 未実施 |
-| AC-088 | TestDispatchAction | action='deny' + warning → reason に warning 付加 | - | 未実施 |
-| AC-089 | TestDispatchAction | action='confirm' → sys.exit(ask) | - | 未実施 |
-| AC-090 | TestDispatchAction | action='allow' + warning='' → sys.exit なし | - | 未実施 |
-| AC-091 | TestDispatchAction | action='allow' + warning あり → sys.exit(warn) [リグレッション] | - | 未実施 |
+| AC-080 | TestBuildConfigWarning | `skipped_rules` 空 → `""` | `""` を返す | PASS |
+| AC-081 | TestBuildConfigWarning | `skipped_rules` あり → `"⚠"` で始まる文字列 | `"⚠"` で始まる文字列 | PASS |
+| AC-082 | TestLoadConfigOrExit | FileNotFoundError → event.warn() + sys.exit(0) | event.warn() 呼び出し後 sys.exit(0) | PASS |
+| AC-083 | TestLoadConfigOrExit | Exception → event.warn() + sys.exit(0) | event.warn() にエラー文字列を含む、sys.exit(0) | PASS |
+| AC-084 | TestLoadConfigOrExit | 正常読み込み → config を返す | config オブジェクトを返す（sys.exit なし） | PASS |
+| AC-085 | TestDispatchAction | result=None + warning='' → sys.exit なし | sys.exit なし、event メソッド未呼び出し | PASS |
+| AC-086 | TestDispatchAction | result=None + warning あり → sys.exit(warn) | event.warn() 呼び出し後 sys.exit(0) | PASS |
+| AC-087 | TestDispatchAction | action='deny' → sys.exit(2) | event.deny() 呼び出し後 sys.exit(2) | PASS |
+| AC-088 | TestDispatchAction | action='deny' + warning → reason に warning 付加 | deny の reason 引数に warning を含む | PASS |
+| AC-089 | TestDispatchAction | action='confirm' → sys.exit(ask) | event.ask() 呼び出し後 sys.exit(0) | PASS |
+| AC-090 | TestDispatchAction | action='allow' + warning='' → sys.exit なし | sys.exit なし | PASS |
+| AC-091 | TestDispatchAction | action='allow' + warning あり → sys.exit(warn) [リグレッション] | event.warn() 呼び出し後 sys.exit(0) | PASS |
 
 ---
 
