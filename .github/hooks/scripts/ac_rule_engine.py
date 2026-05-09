@@ -228,14 +228,9 @@ def _determine_operation_type(tool_name: str) -> Optional[str]:
 
 
 def _get_candidate_rules(config: AccessControlConfig, operation_type: str) -> List[Rule]:
-    """操作タイプに対応するルールリストを返す。"""
-    if operation_type == "write":
-        return config.write_rules
-    if operation_type == "read":
-        return config.read_rules
-    if operation_type == "command":
-        return config.command_rules
-    return []
+    """操作タイプに対応するグループが有効な場合そのルールリストを、無効な場合空リストを返す。"""
+    group = config.get_group(operation_type)
+    return group.rules if group.enabled else []
 
 
 # ---------------------------------------------------------------------------
@@ -262,6 +257,9 @@ def evaluate(config: AccessControlConfig, context: MatchContext) -> Optional[Rul
     """
     operation_type = _determine_operation_type(context.tool_name)
     if operation_type is None:
+        return None
+
+    if not config.enabled:
         return None
 
     candidates = _get_candidate_rules(config, operation_type)

@@ -61,15 +61,28 @@ def main() -> None:
             config = load_config(CONFIG_PATH)
         except FileNotFoundError:
             DEBUG.log("skip", reason="config not found", path=str(CONFIG_PATH))
-            return
+            sys.exit(event.warn(
+                f"⚠ アクセス制御設定ファイルが見つかりません。設定ファイルを作成するか、Hookを無効にしてください:\n"
+                f"  期待パス: {CONFIG_PATH}"
+            ))
         except Exception as exc:
             DEBUG.log("error", stage="load_config", exc=str(exc))
-            return
+            sys.exit(event.warn(
+                f"⚠ アクセス制御設定ファイルの読み込みに失敗しました。設定ファイルを修正してください:\n"
+                f"  ファイル: {CONFIG_PATH}\n"
+                f"  エラー: {exc}"
+            ))
 
         context = MatchContext(
             tool_name=event.tool_name,
             tool_input=event.tool_input,
             cwd=event.cwd,
+        )
+
+        config_warning = (
+            "⚠ アクセス制御設定に不正なルールが含まれています。設定ファイルを修正してください:\n"
+            + "\n".join(f"  - {msg}" for msg in config.skipped_rules)
+            if config.skipped_rules else ""
         )
 
         result = evaluate(config, context)
@@ -78,12 +91,17 @@ def main() -> None:
             tool=event.tool_name,
             match_id=result.rule.rule_id if result else None,
             action=result.rule.action if result else "allow",
+            skipped=len(config.skipped_rules),
         )
 
         if result is None:
+            if config_warning:
+                sys.exit(event.warn(config_warning))
             return
 
         reason = _build_reason(result)
+        if config_warning:
+            reason = f"{reason}\n\n{config_warning}"
 
         if result.rule.action == "deny":
             sys.exit(event.deny(reason))

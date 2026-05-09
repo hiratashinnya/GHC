@@ -15,6 +15,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 from ac_config_loader import (
     WhenClause,
     Rule,
+    RuleGroup,
     AccessControlConfig,
     load_config,
     VALID_ACTIONS,
@@ -44,11 +45,16 @@ def _make_config(
     write_rules=None,
     read_rules=None,
     command_rules=None,
+    enabled=True,
+    write_enabled=True,
+    read_enabled=True,
+    command_enabled=True,
 ) -> AccessControlConfig:
     return AccessControlConfig(
-        write_rules=write_rules or [],
-        read_rules=read_rules or [],
-        command_rules=command_rules or [],
+        enabled=enabled,
+        write_rules=RuleGroup(enabled=write_enabled, rules=write_rules or []),
+        read_rules=RuleGroup(enabled=read_enabled, rules=read_rules or []),
+        command_rules=RuleGroup(enabled=command_enabled, rules=command_rules or []),
     )
 
 
@@ -86,6 +92,37 @@ def _disabled_rule(rule_id: str, path_patterns=None) -> Rule:
 # ac_config_loader tests
 # ---------------------------------------------------------------------------
 
+class TestGetGroup(unittest.TestCase):
+
+    def test_AC070_get_group_write(self):
+        """get_group: 'write' → write_rules を返す"""
+        rule = _deny_rule("r1", path_patterns=["docs/**"])
+        config = _make_config(write_rules=[rule])
+        group = config.get_group("write")
+        self.assertEqual(group.rules[0].rule_id, "r1")
+
+    def test_AC071_get_group_read(self):
+        """get_group: 'read' → read_rules を返す"""
+        rule = _deny_rule("r2", path_patterns=["**/.env"])
+        config = _make_config(read_rules=[rule])
+        group = config.get_group("read")
+        self.assertEqual(group.rules[0].rule_id, "r2")
+
+    def test_AC072_get_group_command(self):
+        """get_group: 'command' → command_rules を返す"""
+        rule = _deny_rule("r3", command_patterns=["rm -rf"])
+        config = _make_config(command_rules=[rule])
+        group = config.get_group("command")
+        self.assertEqual(group.rules[0].rule_id, "r3")
+
+    def test_AC073_get_group_unknown_returns_empty(self):
+        """get_group: 未知の操作タイプ → 空 RuleGroup を返す"""
+        config = _make_config()
+        group = config.get_group("network")
+        self.assertIsInstance(group, RuleGroup)
+        self.assertEqual(group.rules, [])
+
+
 class TestLoadConfig(unittest.TestCase):
 
     def setUp(self):
@@ -116,40 +153,70 @@ class TestLoadConfig(unittest.TestCase):
         path = _write_config(self.tmppath, data)
         config = load_config(path)
         self.assertIsInstance(config, AccessControlConfig)
-        self.assertEqual(len(config.write_rules), 1)
-        self.assertEqual(config.write_rules[0].rule_id, "r1")
-        self.assertEqual(config.write_rules[0].action, "deny")
-        self.assertEqual(config.write_rules[0].when.path_patterns, ["docs/**"])
-        self.assertEqual(len(config.read_rules), 1)
-        self.assertEqual(len(config.command_rules), 1)
+        self.assertEqual(len(config.write_rules.rules), 1)
+        self.assertEqual(config.write_rules.rules[0].rule_id, "r1")
+        self.assertEqual(config.write_rules.rules[0].action, "deny")
+        self.assertEqual(config.write_rules.rules[0].when.path_patterns, ["docs/**"])
+        self.assertEqual(len(config.read_rules.rules), 1)
+        self.assertEqual(len(config.command_rules.rules), 1)
 
-    def test_AC002_invalid_action_raises(self):
-        """load_config: 不正な action で ValueError"""
-        data = {"write_rules": [{"id": "r1", "action": "unknown", "when": {}}]}
+    def test_AC002_invalid_action_skipped_with_warning(self):
+        """load_config: 不正な action のルールはスキップされ、skipped_rules にエラーメッセージが格納される"""
+        data = {
+            "write_rules": [
+                {"id": "bad", "action": "unknown", "when": {}},
+                {"id": "good", "action": "deny", "when": {"path_patterns": ["docs/**"]}},
+            ]
+        }
         path = _write_config(self.tmppath, data)
-        with self.assertRaises(ValueError):
-            load_config(path)
+        config = load_config(path)
+        self.assertEqual(len(config.write_rules.rules), 1)
+        self.assertEqual(config.write_rules.rules[0].rule_id, "good")
+        self.assertEqual(len(config.skipped_rules), 1)
+        self.assertIn("bad", config.skipped_rules[0])
 
     def test_AC003_file_not_found(self):
         """load_config: ファイル不在で FileNotFoundError"""
         with self.assertRaises(FileNotFoundError):
             load_config(Path("/nonexistent/access-control.json"))
 
+    def test_AC003b_invalid_json_raises(self):
+        """load_config: JSON 構文エラーで JSONDecodeError"""
+        import json
+        path = self.tmppath / "broken.json"
+        path.write_text("{invalid json", encoding="utf-8")
+        with self.assertRaises(json.JSONDecodeError):
+            load_config(path)
+
     def test_AC004_empty_rules(self):
         """load_config: ルール空配列"""
         data = {"write_rules": [], "read_rules": [], "command_rules": []}
         path = _write_config(self.tmppath, data)
         config = load_config(path)
-        self.assertEqual(config.write_rules, [])
-        self.assertEqual(config.read_rules, [])
-        self.assertEqual(config.command_rules, [])
+        self.assertEqual(config.write_rules.rules, [])
+        self.assertEqual(config.read_rules.rules, [])
+        self.assertEqual(config.command_rules.rules, [])
+
+    def test_AC001b_backward_compat_array_format(self):
+        """load_config: 配列形式 (backward compat) が RuleGroup として読み込まれる"""
+        data = {
+            "write_rules": [
+                {"id": "r1", "action": "deny", "when": {"path_patterns": ["docs/**"]}}
+            ]
+        }
+        path = _write_config(self.tmppath, data)
+        config = load_config(path)
+        self.assertIsInstance(config.write_rules, RuleGroup)
+        self.assertTrue(config.write_rules.enabled)
+        self.assertEqual(len(config.write_rules.rules), 1)
+        self.assertEqual(config.write_rules.rules[0].rule_id, "r1")
 
     def test_AC005_disabled_is_not_active(self):
         """Rule.is_active: disabled → False"""
         data = {"write_rules": [{"id": "r1", "action": "disabled", "when": {}}]}
         path = _write_config(self.tmppath, data)
         config = load_config(path)
-        self.assertFalse(config.write_rules[0].is_active())
+        self.assertFalse(config.write_rules.rules[0].is_active())
 
     def test_AC006_parse_when_path_patterns(self):
         """_parse_when: path_patterns を正しく格納する"""
@@ -157,7 +224,7 @@ class TestLoadConfig(unittest.TestCase):
                                   "when": {"path_patterns": ["docs/**", "iter/**"]}}]}
         path = _write_config(self.tmppath, data)
         config = load_config(path)
-        self.assertEqual(config.write_rules[0].when.path_patterns, ["docs/**", "iter/**"])
+        self.assertEqual(config.write_rules.rules[0].when.path_patterns, ["docs/**", "iter/**"])
 
     def test_AC007_parse_when_command_patterns(self):
         """_parse_when: command_patterns を正しく格納する"""
@@ -165,7 +232,7 @@ class TestLoadConfig(unittest.TestCase):
                                     "when": {"command_patterns": ["rm -rf", "rd /s /q"]}}]}
         path = _write_config(self.tmppath, data)
         config = load_config(path)
-        self.assertEqual(config.command_rules[0].when.command_patterns, ["rm -rf", "rd /s /q"])
+        self.assertEqual(config.command_rules.rules[0].when.command_patterns, ["rm -rf", "rd /s /q"])
 
 
 # ---------------------------------------------------------------------------
@@ -435,6 +502,41 @@ class TestPathNormalization(unittest.TestCase):
         )
         result = evaluate(config, ctx)
         self.assertIsNone(result)
+
+
+# ---------------------------------------------------------------------------
+# 有効/無効制御
+# ---------------------------------------------------------------------------
+
+class TestEnabledDisable(unittest.TestCase):
+
+    def test_AC008_global_enabled_false_allows(self):
+        """グローバル enabled=False → 全ルール無効 → None"""
+        deny = _deny_rule("r1", path_patterns=["docs/**"])
+        config = _make_config(enabled=False, write_rules=[deny])
+        ctx = MatchContext(tool_name="create_file", tool_input={"filePath": "docs/foo.md"})
+        self.assertIsNone(evaluate(config, ctx))
+
+    def test_AC060_write_group_disabled_allows(self):
+        """write_rules.enabled=False → write ルール無効 → None"""
+        deny = _deny_rule("r1", path_patterns=["docs/**"])
+        config = _make_config(write_enabled=False, write_rules=[deny])
+        ctx = MatchContext(tool_name="create_file", tool_input={"filePath": "docs/foo.md"})
+        self.assertIsNone(evaluate(config, ctx))
+
+    def test_AC061_read_group_disabled_allows(self):
+        """read_rules.enabled=False → read ルール無効 → None"""
+        deny = _deny_rule("r1", path_patterns=["**/.env"])
+        config = _make_config(read_enabled=False, read_rules=[deny])
+        ctx = MatchContext(tool_name="read_file", tool_input={"filePath": ".env"})
+        self.assertIsNone(evaluate(config, ctx))
+
+    def test_AC062_command_group_disabled_allows(self):
+        """command_rules.enabled=False → command ルール無効 → None"""
+        deny = _deny_rule("r1", command_patterns=["rm -rf"])
+        config = _make_config(command_enabled=False, command_rules=[deny])
+        ctx = MatchContext(tool_name="run_in_terminal", tool_input={"command": "rm -rf ./dist"})
+        self.assertIsNone(evaluate(config, ctx))
 
 
 # ---------------------------------------------------------------------------

@@ -13,8 +13,19 @@
 | テストID | 観点 | 入力 | 期待動作 |
 |----------|------|------|----------|
 | AC-001 | `load_config` 正常読み込み | 有効な access-control.json | `AccessControlConfig` を返す。write_rules / read_rules / command_rules が正しく格納される |
-| AC-002 | `load_config` 不正 action | action が "unknown" のルール | `ValueError` が送出される |
+| AC-001b | `load_config` 配列形式 backward compat | `write_rules` が配列形式 | `RuleGroup(enabled=True, rules=[...])` として読み込まれる |
+
+### `AccessControlConfig.get_group()`
+
+| テストID | 観点 | 入力 | 期待動作 |
+|----------|------|------|----------|
+| AC-070 | `get_group("write")` | write_rules にルールあり | `write_rules` の RuleGroup を返す |
+| AC-071 | `get_group("read")` | read_rules にルールあり | `read_rules` の RuleGroup を返す |
+| AC-072 | `get_group("command")` | command_rules にルールあり | `command_rules` の RuleGroup を返す |
+| AC-073 | `get_group` 未知タイプ | `operation_type="network"` | 空の `RuleGroup()` を返す |
+| AC-002 | `load_config` 不正 action のルールをスキップ＋警告収集 | action が "unknown" のルール + 有効ルール混在 | 不正ルールのみスキップされ、有効ルールが残る。`skipped_rules` にルールID を含むエラーメッセージが1件格納される |
 | AC-003 | `load_config` ファイル不在 | 存在しないパス | `FileNotFoundError` が送出される |
+| AC-003b | `load_config` JSON 構文エラー | 不正 JSON ファイル | `json.JSONDecodeError` が送出される（`access_control.py` 側で `warn` 送信に変換される） |
 | AC-004 | `load_config` ルール空配列 | 各 rules が `[]` | 空リストの `AccessControlConfig` を返す |
 | AC-005 | `load_config` disabled action | action="disabled" のルール | `Rule.is_active()` が `False` を返す |
 | AC-006 | `_parse_when` path_patterns のみ | `{"path_patterns": ["docs/**"]}` | `WhenClause.path_patterns` に格納される |
@@ -68,3 +79,12 @@
 |----------|------|------|----------|
 | AC-050 | Windows絶対パス→相対POSIX | `C:\GHC\docs\foo.md`, cwd=`C:\GHC` | `docs/foo.md` として `docs/**` にマッチ |
 | AC-051 | cwd外絶対パス→そのままPOSIX | `D:\other\foo.md`, cwd=`C:\GHC` | 相対化されず、`docs/**` にマッチしない |
+
+### 有効/無効制御
+
+| テストID | 観点 | 設定 | tool_name / tool_input | 期待動作 |
+|----------|------|------|------------------------|----------|
+| AC-008 | グローバル enabled=False | `AccessControlConfig.enabled=False` + deny ルール | `create_file` → `docs/foo.md` | `None` を返す（全ルール無効） |
+| AC-060 | write_rules グループ無効 | `write_rules.enabled=False` + deny ルール | `create_file` → `docs/foo.md` | `None` を返す |
+| AC-061 | read_rules グループ無効 | `read_rules.enabled=False` + deny ルール | `read_file` → `.env` | `None` を返す |
+| AC-062 | command_rules グループ無効 | `command_rules.enabled=False` + deny ルール | `run_in_terminal` → `rm -rf ./dist` | `None` を返す |

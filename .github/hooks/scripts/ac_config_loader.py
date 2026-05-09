@@ -61,18 +61,45 @@ class Rule:
 
 
 @dataclass
+class RuleGroup:
+    """操作タイプごとのルールグループ。enabled でグループ単位の有効/無効を切り替えられる。
+
+    拡張ガイド:
+        新しい操作タイプを追加する際にこのクラスは変更不要。
+        AccessControlConfig に新フィールドを追加するだけでよい。
+    """
+    enabled: bool = True
+    rules: List[Rule] = field(default_factory=list)
+
+
+@dataclass
 class AccessControlConfig:
     """アクセス制御設定全体。
+
+    enabled でフック全体を一括で有効/無効にできる。
+    各 rules グループの enabled で操作タイプ単位に切り替えられる。
+    個別ルールは action="disabled" で切り替えられる。
 
     拡張ガイド:
         新しい操作タイプを追加する場合は、このクラスにフィールドを追加し、
         load_config() と ac_rule_engine.py の _get_candidate_rules() を更新する。
     """
+    enabled: bool = True
     description: str = ""
     version: str = "1.0"
-    write_rules: List[Rule] = field(default_factory=list)
-    read_rules: List[Rule] = field(default_factory=list)
-    command_rules: List[Rule] = field(default_factory=list)
+    write_rules: RuleGroup = field(default_factory=RuleGroup)
+    read_rules: RuleGroup = field(default_factory=RuleGroup)
+    command_rules: RuleGroup = field(default_factory=RuleGroup)
+    skipped_rules: List[str] = field(default_factory=list)
+
+    def get_group(self, operation_type: str) -> "RuleGroup":
+        """operation_type に対応する RuleGroup を返す。未知の操作タイプは空 RuleGroup を返す。"""
+        mapping = {
+            "write": self.write_rules,
+            "read": self.read_rules,
+            "command": self.command_rules,
+        }
+        return mapping.get(operation_type, RuleGroup())
 
 
 # ---------------------------------------------------------------------------
@@ -101,10 +128,36 @@ def _parse_rule(raw: dict) -> Rule:
     )
 
 
-def _parse_rule_list(raw_list: object) -> List[Rule]:
+def _parse_rule_list(raw_list: object, errors: List[str]) -> List[Rule]:
     if not isinstance(raw_list, list):
         return []
-    return [_parse_rule(item) for item in raw_list if isinstance(item, dict)]
+    rules: List[Rule] = []
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        try:
+            rules.append(_parse_rule(item))
+        except ValueError as exc:
+            # 不正なルールはスキップし、エラー内容を errors に収集してユーザーへの通知に使う
+            errors.append(str(exc))
+    return rules
+
+
+def _parse_rule_group(raw_group: object, errors: List[str]) -> RuleGroup:
+    """操作タイプごとのルールグループをパースする。
+
+    配列形式の場合は後方互換として enabled=True のグループとして扱う。
+    """
+    if isinstance(raw_group, list):
+        return RuleGroup(enabled=True, rules=_parse_rule_list(raw_group, errors))
+    if isinstance(raw_group, dict):
+        raw_enabled = raw_group.get("enabled", True)
+        enabled = raw_enabled if isinstance(raw_enabled, bool) else True
+        return RuleGroup(
+            enabled=enabled,
+            rules=_parse_rule_list(raw_group.get("rules") or [], errors),
+        )
+    return RuleGroup()
 
 
 # ---------------------------------------------------------------------------
@@ -116,14 +169,21 @@ def load_config(config_path: Path) -> AccessControlConfig:
 
     Raises:
         FileNotFoundError: ファイルが存在しない場合。
-        ValueError: action に無効な値が含まれる場合。
         json.JSONDecodeError: JSON の構文エラー。
+
+    Note:
+        action に無効な値を持つルールは ValueError を送出せず当該ルールのみスキップする。
     """
     raw = json.loads(config_path.read_text(encoding="utf-8"))
+    skipped: List[str] = []
+    raw_enabled = raw.get("enabled", True)
+    enabled = raw_enabled if isinstance(raw_enabled, bool) else True
     return AccessControlConfig(
+        enabled=enabled,
         description=raw.get("description", ""),
         version=raw.get("version", "1.0"),
-        write_rules=_parse_rule_list(raw.get("write_rules")),
-        read_rules=_parse_rule_list(raw.get("read_rules")),
-        command_rules=_parse_rule_list(raw.get("command_rules")),
+        write_rules=_parse_rule_group(raw.get("write_rules"), skipped),
+        read_rules=_parse_rule_group(raw.get("read_rules"), skipped),
+        command_rules=_parse_rule_group(raw.get("command_rules"), skipped),
+        skipped_rules=skipped,
     )
