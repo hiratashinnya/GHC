@@ -44,6 +44,60 @@ def _build_reason(rule_match: RuleMatch) -> str:
     return " | ".join(parts)
 
 
+def _load_config_or_exit(event: PreToolUsePayload, config_path: Path):
+    """設定ファイルを読み込む。失敗時は warn して sys.exit する。"""
+    try:
+        return load_config(config_path)
+    except FileNotFoundError:
+        DEBUG.log("skip", reason="config not found", path=str(config_path))
+        sys.exit(event.warn(
+            f"⚠ アクセス制御設定ファイルが見つかりません。設定ファイルを作成するか、Hookを無効にしてください:\n"
+            f"  期待パス: {config_path}"
+        ))
+    except Exception as exc:
+        DEBUG.log("error", stage="load_config", exc=str(exc))
+        sys.exit(event.warn(
+            f"⚠ アクセス制御設定ファイルの読み込みに失敗しました。設定ファイルを修正してください:\n"
+            f"  ファイル: {config_path}\n"
+            f"  エラー: {exc}"
+        ))
+
+
+def _build_config_warning(config) -> str:
+    """スキップされたルールがある場合に warning 文字列を返す。"""
+    if not config.skipped_rules:
+        return ""
+    return (
+        "⚠ アクセス制御設定に不正なルールが含まれています。設定ファイルを修正してください:\n"
+        + "\n".join(f"  - {msg}" for msg in config.skipped_rules)
+    )
+
+
+def _dispatch_action(
+    event: PreToolUsePayload,
+    result: RuleMatch | None,
+    config_warning: str,
+) -> None:
+    """マッチ結果に応じて deny / confirm / warn を発火する。"""
+    if result is None:
+        if config_warning:
+            sys.exit(event.warn(config_warning))
+        return
+
+    reason = _build_reason(result)
+    if config_warning:
+        reason = f"{reason}\n\n{config_warning}"
+
+    if result.rule.action == "deny":
+        sys.exit(event.deny(reason))
+    elif result.rule.action == "confirm":
+        sys.exit(event.ask(reason))
+    else:
+        # allow または unknown: config_warning があれば必ず表示する
+        if config_warning:
+            sys.exit(event.warn(config_warning))
+
+
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
@@ -57,32 +111,13 @@ def main() -> None:
         if not isinstance(event, PreToolUsePayload):
             return
 
-        try:
-            config = load_config(CONFIG_PATH)
-        except FileNotFoundError:
-            DEBUG.log("skip", reason="config not found", path=str(CONFIG_PATH))
-            sys.exit(event.warn(
-                f"⚠ アクセス制御設定ファイルが見つかりません。設定ファイルを作成するか、Hookを無効にしてください:\n"
-                f"  期待パス: {CONFIG_PATH}"
-            ))
-        except Exception as exc:
-            DEBUG.log("error", stage="load_config", exc=str(exc))
-            sys.exit(event.warn(
-                f"⚠ アクセス制御設定ファイルの読み込みに失敗しました。設定ファイルを修正してください:\n"
-                f"  ファイル: {CONFIG_PATH}\n"
-                f"  エラー: {exc}"
-            ))
+        config = _load_config_or_exit(event, CONFIG_PATH)
+        config_warning = _build_config_warning(config)
 
         context = MatchContext(
             tool_name=event.tool_name,
             tool_input=event.tool_input,
             cwd=event.cwd,
-        )
-
-        config_warning = (
-            "⚠ アクセス制御設定に不正なルールが含まれています。設定ファイルを修正してください:\n"
-            + "\n".join(f"  - {msg}" for msg in config.skipped_rules)
-            if config.skipped_rules else ""
         )
 
         result = evaluate(config, context)
@@ -94,20 +129,7 @@ def main() -> None:
             skipped=len(config.skipped_rules),
         )
 
-        if result is None:
-            if config_warning:
-                sys.exit(event.warn(config_warning))
-            return
-
-        reason = _build_reason(result)
-        if config_warning:
-            reason = f"{reason}\n\n{config_warning}"
-
-        if result.rule.action == "deny":
-            sys.exit(event.deny(reason))
-
-        if result.rule.action == "confirm":
-            sys.exit(event.ask(reason))
+        _dispatch_action(event, result, config_warning)
 
     except SystemExit:
         raise
