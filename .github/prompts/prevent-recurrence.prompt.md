@@ -11,7 +11,7 @@ $input
 
 ## Instructions
 
-Execute all 7 stages defined in your agent instructions **in order without skipping**.
+Execute all 8 stages defined in your agent instructions **in order without skipping**.
 
 ### Stage sequencing rules
 
@@ -22,13 +22,14 @@ Execute all 7 stages defined in your agent instructions **in order without skipp
    - If **Rejected**: stop and report cancellation.
    - If **Revise**: return to Stage 4, incorporate the feedback, and re-present Stage 5.
 3. Only after approval: execute Stage 6 (implementation), then Stage 7 (verification).
+4. After Stage 7: Execute Stage 8. If Stage 1–2 identified artifact issues (docs/, src/, etc.), invoke the `artifact-fix` subagent with explicit targets, findings, and fix guidelines. Skip Stage 8 and report completion if the incident was a process-only violation with no artifact to fix.
 
 ### Scope constraints
 
 - Investigations are limited to recent git history and `.github/` files.
-- Edits are limited to `.github/` customization files only:
+- This agent's direct edits are limited to `.github/` customization files only:
   `copilot-instructions.md`, `agents/`, `skills/`, `prompts/`, `instructions/`
-- Do **not** modify production code, test files, or docs.
+- Artifact fixes (docs/, src/, etc.) are delegated to the `artifact-fix` subagent in Stage 8. This agent must not directly edit those files.
 
 ### Output quality rules
 
