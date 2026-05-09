@@ -88,3 +88,32 @@
 | AC-060 | write_rules グループ無効 | `write_rules.enabled=False` + deny ルール | `create_file` → `docs/foo.md` | `None` を返す |
 | AC-061 | read_rules グループ無効 | `read_rules.enabled=False` + deny ルール | `read_file` → `.env` | `None` を返す |
 | AC-062 | command_rules グループ無効 | `command_rules.enabled=False` + deny ルール | `run_in_terminal` → `rm -rf ./dist` | `None` を返す |
+
+### access_control.py — ヘルパー関数
+
+#### `_build_config_warning(config)`
+
+| テストID | 観点 | 入力 | 期待動作 |
+|----------|------|------|----------|
+| AC-080 | skipped_rules 空 → 空文字 | `config.skipped_rules = []` | `""` を返す |
+| AC-081 | skipped_rules あり → warning 文字列 | `config.skipped_rules = ["bad-rule: invalid action"]` | `"⚠"` で始まる非空文字列を返す |
+
+#### `_load_config_or_exit(event, config_path)`
+
+| テストID | 観点 | 入力 | 期待動作 |
+|----------|------|------|----------|
+| AC-082 | 設定ファイル不在 | `load_config` が `FileNotFoundError` を送出 | `event.warn()` を呼び出して `sys.exit(0)` |
+| AC-083 | 設定ファイル parse エラー | `load_config` が `Exception` を送出 | `event.warn()` を呼び出して `sys.exit(0)` |
+| AC-084 | 正常読み込み | 有効な設定ファイル | `config` オブジェクトを返す（sys.exit なし） |
+
+#### `_dispatch_action(event, result, config_warning)`
+
+| テストID | 観点 | result | config_warning | 期待動作 |
+|----------|------|--------|----------------|----------|
+| AC-085 | result=None + warning なし → 何もしない | `None` | `""` | sys.exit されない。event のメソッド呼ばれない |
+| AC-086 | result=None + warning あり → warn 発火 | `None` | `"⚠ bad rules"` | `event.warn()` 呼び出して `sys.exit(0)` |
+| AC-087 | action="deny" → deny 発火 | deny の `RuleMatch` | `""` | `event.deny(reason)` 呼び出して `sys.exit(2)` |
+| AC-088 | action="deny" + warning あり → warning を reason に付加 | deny の `RuleMatch` | `"⚠ bad rules"` | `event.deny()` の引数に warning が含まれる |
+| AC-089 | action="confirm" → ask 発火 | confirm の `RuleMatch` | `""` | `event.ask(reason)` 呼び出して `sys.exit(0)` |
+| AC-090 | action="allow" + warning なし → 何もしない | allow の `RuleMatch` | `""` | sys.exit されない。event のメソッド呼ばれない |
+| AC-091 | action="allow" + warning あり → warn 発火（リグレッション） | allow の `RuleMatch` | `"⚠ bad rules"` | `event.warn()` 呼び出して `sys.exit(0)`（旧バグ: 握りつぶしていた） |

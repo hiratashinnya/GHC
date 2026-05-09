@@ -52,6 +52,18 @@
 | AC-071 | TestGetGroup | `get_group("read")` → read_rules を返す | `rules[0].rule_id == "r2"` | PASS |
 | AC-072 | TestGetGroup | `get_group("command")` → command_rules を返す | `rules[0].rule_id == "r3"` | PASS |
 | AC-073 | TestGetGroup | `get_group` 未知タイプ → 空 RuleGroup | `RuleGroup(rules=[])` | PASS |
+| AC-080 | TestBuildConfigWarning | `skipped_rules` 空 → `""` | - | 未実施 |
+| AC-081 | TestBuildConfigWarning | `skipped_rules` あり → `"⚠"` で始まる文字列 | - | 未実施 |
+| AC-082 | TestLoadConfigOrExit | FileNotFoundError → event.warn() + sys.exit(0) | - | 未実施 |
+| AC-083 | TestLoadConfigOrExit | Exception → event.warn() + sys.exit(0) | - | 未実施 |
+| AC-084 | TestLoadConfigOrExit | 正常読み込み → config を返す | - | 未実施 |
+| AC-085 | TestDispatchAction | result=None + warning='' → sys.exit なし | - | 未実施 |
+| AC-086 | TestDispatchAction | result=None + warning あり → sys.exit(warn) | - | 未実施 |
+| AC-087 | TestDispatchAction | action='deny' → sys.exit(2) | - | 未実施 |
+| AC-088 | TestDispatchAction | action='deny' + warning → reason に warning 付加 | - | 未実施 |
+| AC-089 | TestDispatchAction | action='confirm' → sys.exit(ask) | - | 未実施 |
+| AC-090 | TestDispatchAction | action='allow' + warning='' → sys.exit なし | - | 未実施 |
+| AC-091 | TestDispatchAction | action='allow' + warning あり → sys.exit(warn) [リグレッション] | - | 未実施 |
 
 ---
 

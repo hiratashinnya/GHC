@@ -8,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 SCRIPTS_DIR = Path(r"c:\GHC\.github\hooks\scripts")
 sys.path.insert(0, str(SCRIPTS_DIR))
@@ -29,6 +30,12 @@ from ac_rule_engine import (
     _match_path_patterns,
     _match_command_patterns,
 )
+from access_control import (
+    _build_config_warning,
+    _load_config_or_exit,
+    _dispatch_action,
+)
+from hook_payload import PreToolUsePayload
 
 
 # ---------------------------------------------------------------------------
@@ -537,6 +544,147 @@ class TestEnabledDisable(unittest.TestCase):
         config = _make_config(command_enabled=False, command_rules=[deny])
         ctx = MatchContext(tool_name="run_in_terminal", tool_input={"command": "rm -rf ./dist"})
         self.assertIsNone(evaluate(config, ctx))
+
+
+# ---------------------------------------------------------------------------
+# access_control.py helper function tests
+# ---------------------------------------------------------------------------
+
+def _make_mock_event() -> MagicMock:
+    """PreToolUsePayload のモックを返す。warn=0, deny=2, ask=0 を返す。"""
+    event = MagicMock(spec=PreToolUsePayload)
+    event.warn.return_value = 0
+    event.deny.return_value = 2
+    event.ask.return_value = 0
+    return event
+
+
+def _deny_rule_match(rule_id: str = "r1", path: str = "docs/foo.md") -> RuleMatch:
+    return RuleMatch(
+        rule=Rule(rule_id=rule_id, action="deny", when=WhenClause()),
+        matched_values=[path],
+    )
+
+
+def _confirm_rule_match(rule_id: str = "r1") -> RuleMatch:
+    return RuleMatch(
+        rule=Rule(rule_id=rule_id, action="confirm", when=WhenClause()),
+        matched_values=[],
+    )
+
+
+def _allow_rule_match(rule_id: str = "r1") -> RuleMatch:
+    return RuleMatch(
+        rule=Rule(rule_id=rule_id, action="allow", when=WhenClause()),
+        matched_values=[],
+    )
+
+
+class TestBuildConfigWarning(unittest.TestCase):
+
+    def test_AC080_empty_skipped_rules_returns_empty_string(self):
+        """_build_config_warning: skipped_rules 空 → ''"""
+        config = MagicMock()
+        config.skipped_rules = []
+        self.assertEqual(_build_config_warning(config), "")
+
+    def test_AC081_skipped_rules_returns_warning_string(self):
+        """_build_config_warning: skipped_rules あり → '⚠' で始まる文字列"""
+        config = MagicMock()
+        config.skipped_rules = ["bad-rule: invalid action 'hack'"]
+        result = _build_config_warning(config)
+        self.assertTrue(result.startswith("⚠"))
+        self.assertIn("bad-rule", result)
+
+
+class TestLoadConfigOrExit(unittest.TestCase):
+
+    def test_AC082_file_not_found_exits_with_warn(self):
+        """_load_config_or_exit: FileNotFoundError → event.warn() 呼び出し後 sys.exit(0)"""
+        event = _make_mock_event()
+        with patch("access_control.load_config", side_effect=FileNotFoundError):
+            with self.assertRaises(SystemExit) as ctx:
+                _load_config_or_exit(event, Path("nonexistent.json"))
+        self.assertEqual(ctx.exception.code, 0)
+        event.warn.assert_called_once()
+
+    def test_AC083_parse_error_exits_with_warn(self):
+        """_load_config_or_exit: Exception → event.warn() 呼び出し後 sys.exit(0)"""
+        event = _make_mock_event()
+        with patch("access_control.load_config", side_effect=Exception("parse failed")):
+            with self.assertRaises(SystemExit) as ctx:
+                _load_config_or_exit(event, Path("bad.json"))
+        self.assertEqual(ctx.exception.code, 0)
+        event.warn.assert_called_once()
+        self.assertIn("parse failed", event.warn.call_args[0][0])
+
+    def test_AC084_valid_config_returns_config(self):
+        """_load_config_or_exit: 正常 → config を返す（sys.exit なし）"""
+        event = _make_mock_event()
+        expected = MagicMock()
+        with patch("access_control.load_config", return_value=expected):
+            result = _load_config_or_exit(event, Path("ok.json"))
+        self.assertIs(result, expected)
+        event.warn.assert_not_called()
+
+
+class TestDispatchAction(unittest.TestCase):
+
+    def test_AC085_none_result_no_warning_does_nothing(self):
+        """_dispatch_action: result=None + config_warning='' → sys.exit なし"""
+        event = _make_mock_event()
+        _dispatch_action(event, None, "")
+        event.warn.assert_not_called()
+        event.deny.assert_not_called()
+        event.ask.assert_not_called()
+
+    def test_AC086_none_result_with_warning_exits_warn(self):
+        """_dispatch_action: result=None + config_warning あり → sys.exit(warn)"""
+        event = _make_mock_event()
+        with self.assertRaises(SystemExit) as ctx:
+            _dispatch_action(event, None, "⚠ bad rules")
+        self.assertEqual(ctx.exception.code, 0)
+        event.warn.assert_called_once_with("⚠ bad rules")
+
+    def test_AC087_deny_action_exits_deny(self):
+        """_dispatch_action: action='deny' → sys.exit(deny) / exit code 2"""
+        event = _make_mock_event()
+        with self.assertRaises(SystemExit) as ctx:
+            _dispatch_action(event, _deny_rule_match(), "")
+        self.assertEqual(ctx.exception.code, 2)
+        event.deny.assert_called_once()
+
+    def test_AC088_deny_action_with_warning_appends_warning_to_reason(self):
+        """_dispatch_action: action='deny' + config_warning → reason に warning を含む"""
+        event = _make_mock_event()
+        with self.assertRaises(SystemExit):
+            _dispatch_action(event, _deny_rule_match(), "⚠ bad rules")
+        reason_arg = event.deny.call_args[0][0]
+        self.assertIn("⚠ bad rules", reason_arg)
+
+    def test_AC089_confirm_action_exits_ask(self):
+        """_dispatch_action: action='confirm' → sys.exit(ask) / exit code 0"""
+        event = _make_mock_event()
+        with self.assertRaises(SystemExit) as ctx:
+            _dispatch_action(event, _confirm_rule_match(), "")
+        self.assertEqual(ctx.exception.code, 0)
+        event.ask.assert_called_once()
+
+    def test_AC090_allow_action_no_warning_does_nothing(self):
+        """_dispatch_action: action='allow' + config_warning='' → sys.exit なし"""
+        event = _make_mock_event()
+        _dispatch_action(event, _allow_rule_match(), "")
+        event.warn.assert_not_called()
+        event.deny.assert_not_called()
+        event.ask.assert_not_called()
+
+    def test_AC091_allow_action_with_warning_exits_warn_regression(self):
+        """_dispatch_action: action='allow' + config_warning あり → sys.exit(warn) [リグレッション]"""
+        event = _make_mock_event()
+        with self.assertRaises(SystemExit) as ctx:
+            _dispatch_action(event, _allow_rule_match(), "⚠ bad rules")
+        self.assertEqual(ctx.exception.code, 0)
+        event.warn.assert_called_once_with("⚠ bad rules")
 
 
 # ---------------------------------------------------------------------------
