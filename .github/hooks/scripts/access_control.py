@@ -32,18 +32,6 @@ DEBUG = HookDebugLogger(SCRIPT_DIR, "access_control")
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _build_reason(rule_match: RuleMatch) -> str:
-    """ユーザー向けのブロック/確認理由メッセージを構築する。"""
-    rule = rule_match.rule
-    parts = []
-    if rule.description:
-        parts.append(rule.description)
-    if rule_match.matched_values:
-        parts.append(f"対象: {', '.join(rule_match.matched_values)}")
-    parts.append(f"ルールID: {rule.rule_id}")
-    return " | ".join(parts)
-
-
 def _load_config_or_exit(event: PreToolUsePayload, config_path: Path):
     """設定ファイルを読み込む。失敗時は warn して sys.exit する。"""
     try:
@@ -84,7 +72,7 @@ def _dispatch_action(
             sys.exit(event.warn(config_warning))
         return
 
-    reason = _build_reason(result)
+    reason = result.to_reason()
     if config_warning:
         reason = f"{reason}\n\n{config_warning}"
 

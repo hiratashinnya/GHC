@@ -88,6 +88,16 @@ class RuleMatch:
     rule: Rule
     matched_values: List[str] = field(default_factory=list)
 
+    def to_reason(self) -> str:
+        """ユーザー向けのブロック/確認理由メッセージを返す。"""
+        parts = []
+        if self.rule.description:
+            parts.append(self.rule.description)
+        if self.matched_values:
+            parts.append(f"対象: {', '.join(self.matched_values)}")
+        parts.append(f"ルールID: {self.rule.rule_id}")
+        return " | ".join(parts)
+
 
 # ---------------------------------------------------------------------------
 # Path / command extraction helpers
