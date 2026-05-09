@@ -75,6 +75,15 @@ When asked to **run tests**:
 
 ## Task: Add a New Test Suite
 
+> **⚠ 実施順序の厳守** — 以下の順序を逆にしてはならない。
+> 1. `testcase.md` を作成・更新（テスト仕様を先に定義する）
+> 2. テストコードを実装する
+> 3. **コミットする**（`git add / git commit`）
+> 4. テストを実行する
+> 5. `testresult.md` にコミットIDと結果を記録する
+>
+> testcase.md をテスト実行後に辻褄合わせで更新すること、およびコミット前にテスト実行してコミットIDが「未コミット変更あり」になることは禁止。
+
 When asked to **add tests for `<script_name>`**:
 
 ### Step 1 — Create directory and files
