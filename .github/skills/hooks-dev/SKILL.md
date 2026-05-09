@@ -215,6 +215,7 @@ See [hooks-test.prompt.md](../../prompts/hooks-test.prompt.md) for full command 
 | JSON output with `ensure_ascii=True` (default) | Always use `ensure_ascii=False` for Japanese characters |
 | Using `payload.get("tool_name")` directly in new scripts | Import `hook_payload` and use `parse_payload()` for typed access |
 | Blocking a `read_file` with write-tool logic | Use `is_read_tool()` + `get_read_paths()` — separate from write-tool path |
+| アクション分岐が網羅的でない（allow/unknown が fall-through して config_warning 等を握りつぶす） | 既知アクション（deny/confirm/allow）を明示的に処理するか、末尾に `else` 節で `warn()` を呼ぶ |
 
 ---
 

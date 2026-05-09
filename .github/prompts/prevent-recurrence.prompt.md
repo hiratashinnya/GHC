@@ -22,7 +22,14 @@ Execute all 8 stages defined in your agent instructions **in order without skipp
    - If **Rejected**: stop and report cancellation.
    - If **Revise**: return to Stage 4, incorporate the feedback, and re-present Stage 5.
 3. Only after approval: execute Stage 6 (implementation), then Stage 7 (verification).
-4. After Stage 7: Execute Stage 8. If Stage 1–2 identified artifact issues (docs/, src/, etc.), invoke the `artifact-fix` subagent with explicit targets, findings, and fix guidelines. Skip Stage 8 and report completion if the incident was a process-only violation with no artifact to fix.
+4. After Stage 7: Execute Stage 8.
+   - Classify artifacts: test files (`test_*.py`, `testcase.md`, `testresult.md`) → delegate to `test-fix`;
+     other artifacts (`docs/`, `src/`) → delegate to `artifact-fix`.
+   - Pass ONLY: target file paths + Stage 1–2 factual findings. Do NOT include fix policies —
+     each subagent designs its own fix approach autonomously.
+   - `test-fix` is responsible for asking the user about test execution and running tests if approved.
+     Do NOT handle test execution in this agent.
+   - Skip Stage 8 and report completion if no artifacts need fixing.
 
 ### Scope constraints
 
