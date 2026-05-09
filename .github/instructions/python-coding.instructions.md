@@ -10,44 +10,15 @@ applyTo: "**/*.py"
 - **標準ライブラリのみ使用する。**`pip install` は禁止。
 - 必要なサードパーティ機能は標準ライブラリで代替するか、プロジェクト内の `_lib/` モジュールを使う。
 
-```python
-# OK
-import os, sys, json, re, subprocess
-from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Optional, List
-
-# NG — 外部パッケージ禁止
-import requests
-import pydantic
-```
+→ コード例: [dependencies-pattern.md](dependencies-pattern.md)
 
 ## データ構造：dataclass を使う
 
 `dict` や `tuple` の多用は禁止。複数フィールドを持つデータは必ず `@dataclass` で定義する。
-
-```python
-# NG
-def process(data: dict) -> tuple:
-    return (data["name"], data["value"])
-
-# OK
-from dataclasses import dataclass
-
-@dataclass
-class ProcessResult:
-    name: str
-    value: int
-```
-
 `field(default_factory=...)` を使い、KeyError を起こさない安全なデフォルトを設定する。
+複数フィールドをキー文字列でルーティングするロジックは dataclass 自身のメソッドとして持つ。
 
-```python
-@dataclass
-class HookPayload:
-    tool_name: str = ""
-    tool_input: dict = field(default_factory=dict)
-```
+→ コード例: [dataclass-pattern.md](dataclass-pattern.md) / ルーティング: [dataclass-routing-pattern.md](dataclass-routing-pattern.md)
 
 ## 命名規則
 
@@ -65,34 +36,14 @@ class HookPayload:
 
 境界値・型・不変条件は `assert` または早期 `raise` で明示する。サイレントに壊れたデータを返さない。
 
-```python
-def phase_index(phase: str) -> int:
-    if phase not in PHASE_INDEX:
-        raise ValueError(f"Unknown phase: {phase!r}")
-    return PHASE_INDEX[phase]
-```
+→ コード例: [validation-pattern.md](validation-pattern.md)
 
 ## main() の設計：薄く、1画面で意図が分かるように
 
 `main()` は **オーケストレーション専用**。ロジックを直書きしない。
 1画面（約30行以内）で「何をするスクリプトか」が読み取れるようにする。
 
-```python
-def main() -> None:
-    payload, workspace, patch_script = _parse_input()
-    changed_files = _extract_changed_docs(payload)
-    if not changed_files:
-        sys.exit(0)
-    _run_patch(patch_script, workspace, changed_files)
-
-
-if __name__ == "__main__":
-    main()
-```
-
-- 入力取得 → 判定 → 処理 → 出力 の流れを明示する
-- 早期 `sys.exit(0)` で不要な処理を避ける
-- ヘルパー関数名は動詞+目的語形式（`_parse_input`, `_run_patch`）
+→ コード例: [main-pattern.md](main-pattern.md)
 
 ## 単一責務の原則
 
@@ -110,64 +61,16 @@ if __name__ == "__main__":
 ## モジュール・関数ドキュメント
 
 モジュール先頭と各関数に以下の形式で docstring を書く。
-
-```python
-#!/usr/bin/env python3
-"""モジュールの一言説明。
-
-責務:
-    このモジュールが担う唯一の仕事を記述する。
-
-入力:
-    関数引数の概要、または stdin / ファイル。
-
-出力:
-    戻り値の概要、または stdout / ファイル。
-
-副作用:
-    ファイル書き込み・プロセス起動など。なければ「なし」。
-
-依存モジュール:
-    使用する標準ライブラリ・内部モジュール名。
-"""
-```
-
 関数レベルも同じ4項目（責務・入力・出力・副作用）を簡潔に記述する。
+
+→ テンプレート: [docstring-pattern.md](docstring-pattern.md)
 
 ## テスト：unittest
 
 テストは `unittest.TestCase` を使う。`pytest` は使わない。
-
-```python
-#!/usr/bin/env python3
-"""Unit tests for <module>.py"""
-
-from __future__ import annotations
-
-import sys
-import unittest
-from pathlib import Path
-
-SCRIPTS_DIR = Path(r"c:\GHC\.github\hooks\scripts")
-sys.path.insert(0, str(SCRIPTS_DIR))
-
-from my_module import my_function
-
-
-class TestMyFunction(unittest.TestCase):
-
-    def test_XX001_description_of_what_is_tested(self):
-        self.assertEqual(my_function("input"), "expected")
-
-    def test_XX002_edge_case(self):
-        self.assertIsNone(my_function(""))
-
-
-if __name__ == "__main__":
-    unittest.main()
-```
-
 テストIDは `TT###` 形式（`TT` = 対象モジュール略称2文字、`###` = 連番）。
+
+→ テンプレート: [unittest-pattern.md](unittest-pattern.md)
 
 ## その他
 
