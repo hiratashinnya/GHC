@@ -17,6 +17,8 @@ applyTo: "**/*.py"
 `dict` や `tuple` の多用は禁止。複数フィールドを持つデータは必ず `@dataclass` で定義する。
 `field(default_factory=...)` を使い、KeyError を起こさない安全なデフォルトを設定する。
 複数フィールドをキー文字列でルーティングするロジックは dataclass 自身のメソッドとして持つ。
+dataclass の複数フィールドを組み合わせた文字列表現・メッセージ生成も同様に、
+外部層がフィールドを直接参照するのではなく dataclass 自身のメソッドとして定義する。
 
 → コード例: [dataclass-pattern.md](dataclass-pattern.md) / ルーティング: [dataclass-routing-pattern.md](dataclass-routing-pattern.md)
 
