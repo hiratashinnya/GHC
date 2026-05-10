@@ -27,7 +27,7 @@ user-invocable: true
 ### artifact モード（`verification_scope: "artifacts"`）
 - DO NOT `artifacts` モード時は **edit ツール使用禁止**（コミット済み成果物を直接編集しない）
 - Lv1 = 「再委託フラグ」として返す（auto-fix ではなく、呼び出し元の artifact-fix / test-fix に再委託）
-- ONLY `docs/`, `src/`, `TestHooks/` の read を許可（.github/ 除外）
+- ONLY `docs/`, `src/`, `TestHooks/`, `.github/perspectives/` の read を許可（`.github/perspectives/` は観点読込のための例外）
 - artifact モード時は Lv1 の修正ではなく、再委託対象を明示的に表記して返す
 
 ---
@@ -40,6 +40,7 @@ user-invocable: true
 | `stage1_2_summary` | Stage 1-2 の事実・指摘サマリー | Stage 1-2 の事実・指摘サマリー（コンテキスト） |
 | `verification_scope` | 省略 = `"customizations"` | `"artifacts"` を明示指定 |
 | 追加情報（artifact のみ） | — | `fixed_subagent`: 対象エージェント（`"artifact-fix"` \| `"test-fix"`） |
+| 追加情報（artifact-fix のみ） | — | `artifact_target_kind`: `"docs"` または `"code"` を呼び出し元が明示 |
 | 観点の指定 | 省略時 = customization.md + prevent-recurrence.md | scope に応じて自動選択（後述） |
 
 ## モード別の観点選択（自動）
@@ -48,22 +49,27 @@ user-invocable: true
 - 対象: `.github/agents/*.agent.md`, `.github/skills/*/SKILL.md` など
 - 観点: `customization.md` (P-CUS-01～05) + `prevent-recurrence.md` (P-PR-01～05)
   → prevent-recurrence 提案であることに基づいて自動選択
+- V1 観点: `.github/perspectives/v1-customization.md` のみ
+- `perspective_scope` による必須観点の上書きは禁止（混入防止）
 
-**artifact モード - docs/src 検証** (`verification_scope: "artifacts"` + `fixed_subagent: "artifact-fix"`)
+**artifact モード - docs 検証** (`verification_scope: "artifacts"` + `fixed_subagent: "artifact-fix"` + `artifact_target_kind: "docs"`)
 - 対象: `docs/**/*.md`
 - 観点: `artifact-docs.md` (P-DOC-01～04) のみ
+- V1 観点: `.github/perspectives/v1-artifact-docs.md` のみ
 - Lv1 対応: 再委託フラグとして artifact-fix に返す
 
 **artifact モード - test 検証** (`verification_scope: "artifacts"` + `fixed_subagent: "test-fix"`)
 - 対象: `TestHooks/**/test_*.py`, `TestHooks/**/testcase.md`, `TestHooks/**/testresult.md`
 - 観点: `artifact-tests.md` (P-TST-01～04) のみ
+- V1 観点: `.github/perspectives/v1-artifact-tests.md` のみ
 - Lv1 対応: 再委託フラグとして test-fix に返す
 
-**artifact モード - code 検証** (`verification_scope: "artifacts"` + `fixed_subagent: "artifact-fix"` + 対象が `src/`)
+**artifact モード - code 検証** (`verification_scope: "artifacts"` + `fixed_subagent: "artifact-fix"` + `artifact_target_kind: "code"`)
 - 対象: `src/**/*.py` など
 - 観点: `artifact-code.md` (P-CODE-01～05) のみ
-- Lv1 対応: 再委託フラグとして artifact-fix に返す（共通構造）n
-どのモードでも V1 → V2 → V3 の流れは同一。モード間の差異は「V1 のチェック項目」と「edit 許可範囲」のみ。
+- V1 観点: `.github/perspectives/v1-artifact-code.md` のみ
+- Lv1 対応: 再委託フラグとして artifact-fix に返す（共通構造）
+どのモードでも V1 → V2 → V3 の流れは同一。モード間の差異は「V1 観点ファイル」「V2 観点ファイル」「edit 許可範囲」。
 
 ### Stage V1 — 静的・形式的検証（Static Formal Check）
 
@@ -79,28 +85,30 @@ user-invocable: true
 
 2. `draft_targets` の全ファイルを読む
 
-3. 以下のチェックを機械的に実施する（モードで異なる場合は注記）:
+3. V1 観点ファイルを **モード別に1種類のみ** 読み込む（混入防止）:
+   - customization: `.github/perspectives/v1-customization.md`
+   - artifact docs: `.github/perspectives/v1-artifact-docs.md`
+   - artifact tests: `.github/perspectives/v1-artifact-tests.md`
+   - artifact code: `.github/perspectives/v1-artifact-code.md`
 
-  | チェック | customization モード | artifact モード |
-  |----------|-----|-----|
-  | YAML frontmatterと `.github/` ファイル構文チェック（`---`, `name`, `description` 等） | 実施 | 実施しない（対象外） |
-  | `name` とファイル名の整合 | 実施 | 実施しない（対象外） |
-  | 禁止 Python パッケージのインポート | `search` で検索 | 実施（`import requests` 等を検出） |
-  | 曖昧表現（「適切に」等）が制約文に含まれるか | 実施 | 実施しない（対象外） |
-  | 完全重複ルール | `search` で検索 | 実施しない（対象外） |
-  | docs 形式エラー（構文的な Markdown 破損等） | — | 実施 |
-  | testcase.md ↔ test_*.py 基本的な対応チェック | — | 実施（section 数一致等） |
-  | Python code lint（import, indent 等） | — | 実施 |
+4. 読み込んだ V1 観点ファイルのチェックIDに従って静的検証を実施する
 
-4. 検出した全 Lv1 候補を列挙する
+5. 検出した全 Lv1 候補を列挙する
 
-5. **customization モード時のみ**: Lv1 候補を即時自動修正する（`edit` ツール使用）
+6. **customization モード時のみ**: Lv1 候補を即時自動修正する（`edit` ツール使用）
 
-6. **artifact モード時**:   
+7. **artifact モード時**:
    - Lv1 候補を修正対象として記録するが、`edit` は実行しない
    - 代わりに「再委託対象（{Lv1チェック項目}）」として、呼び出し元に返す情報に含める
 
-7. 修正内容を簡易ログとして記録する（customization モード）または再委託フラグリストを作成（artifact モード）
+8. 修正内容を簡易ログとして記録する（customization モード）または再委託フラグリストを作成（artifact モード）
+   - 各指摘は次の証跡項目を必須とする:
+     - `file_path`
+     - `check_id`
+     - `detection_method`
+     - `evidence_excerpt`
+     - `reason`
+     - `provisional_level`
 
 出力:
 ```
@@ -114,7 +122,11 @@ V2 へ引き渡す草案（修正済み）: {ファイルパス一覧}
 **artifact モード時**:
 検出した Lv1 候補: {N} 件
 [再委託フラグリスト]
-- {ファイルパス}: {Lv1チェック項目} → 担当エージェント（{fixed_subagent}）に再委託推奨
+- {file_path}: {check_id} → 担当エージェント（{fixed_subagent}）に再委託推奨
+   - detection_method: {...}
+   - evidence_excerpt: {...}
+   - reason: {...}
+   - provisional_level: Lv1
 ...
 V2 へ引き渡す草案（修正なし、検証対象のまま）: {ファイルパス一覧}
 ```
@@ -157,7 +169,8 @@ V2 へ引き渡す草案（修正なし、検証対象のまま）: {ファイ�
 **目的**: artifact モード時の V2 検証。修正済み artifact を 2〜3 種類の観点で検証する。
 
 必要な観点ファイルの決定:
-- `fixed_subagent` = `"artifact-fix"` → `.github/perspectives/artifact-docs.md` (P-DOC-01〜04) + `.github/perspectives/artifact-code.md` (P-CODE-01〜05)
+- `fixed_subagent` = `"artifact-fix"` かつ `artifact_target_kind` = `"docs"` → `.github/perspectives/artifact-docs.md` (P-DOC-01〜04)
+- `fixed_subagent` = `"artifact-fix"` かつ `artifact_target_kind` = `"code"` → `.github/perspectives/artifact-code.md` (P-CODE-01〜05)
 - `fixed_subagent` = `"test-fix"` → `.github/perspectives/artifact-tests.md` (P-TST-01〜04)
 
 手順:
@@ -167,6 +180,7 @@ V2 へ引き渡す草案（修正なし、検証対象のまま）: {ファイ�
    - `perspective_id`: セクションID（例: `P-DOC-01`, `P-TST-01`, `P-CODE-01` 等）
    - `draft_targets`: V1 を通した artifact ファイルパス一覧
    - `artifact_context`: artifact が修正対象であること（customization Stage 6-7 とは異なるコンテキスト）
+   - `artifact_target_kind`: `docs` / `code` / `tests`（呼び出し元で明示）
 
 3. 全 `perspective-checker` 結果を観点別に整理して出力
 

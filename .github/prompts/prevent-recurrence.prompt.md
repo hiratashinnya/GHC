@@ -11,7 +11,7 @@ $input
 
 ## Instructions
 
-Execute all 8 stages defined in your agent instructions **in order without skipping**.
+Execute all stages defined in your agent instructions in order without skipping.
 
 ### Stage sequencing rules
 
@@ -30,6 +30,7 @@ Execute all 8 stages defined in your agent instructions **in order without skipp
    - `test-fix` is responsible for asking the user about test execution and running tests if approved.
      Do NOT handle test execution in this agent.
    - Skip Stage 8 and report completion if no artifacts need fixing.
+5. If your agent instructions define artifact verification branches after Stage 8, execute them in order and then produce the final report.
 
 ### Scope constraints
 
@@ -47,3 +48,6 @@ Execute all 8 stages defined in your agent instructions **in order without skipp
 - Stage 5: present the diff clearly and ask for approval with explicit options.
 - Stage 6: read each file before editing; use `todo` to track each change item.
 - Stage 7: trace the prevention logic step-by-step to confirm it covers the reported incident.
+- Stage 7: self-verify all changed files and report per-file PASS/FAIL.
+- Stage 7 self-verification fields: file path, check point, evidence, decision reason.
+- If any file is FAIL in Stage 7, return to Stage 4 and revise before proceeding.

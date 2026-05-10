@@ -260,9 +260,12 @@ Lv3指摘（ブロック）: N 件
 2. 修正ファイルの種別を判定する:
    - ドキュメント（`.md`, `.txt` 等）→ `artifact-docs` 観点を適用
    - ソースコード（`.py`, `.ts` 等）→ `artifact-code` 観点を適用
-3. `adversarial` subagent を呼び出す:
+3. `adversarial` subagent を **種別ごとに分けて** 呼び出す:
+   - docs 対象を検証する呼び出し（必要時のみ）
+   - code 対象を検証する呼び出し（必要時のみ）
    - `verification_scope`: `"artifacts"`
    - `fixed_subagent`: `"artifact-fix"`
+   - `artifact_target_kind`: `"docs"` または `"code"` を呼び出し側で明示
    - `draft_targets`: 修正ファイルのパス一覧（実際の git commit ID と一緒に提供）
 4. `adversarial` から返されたレポートを解析する:
    - **Lv1（再委託対象）**: `artifact-fix` に再度呼び出す。指摘内容と再委託フラグを共有
