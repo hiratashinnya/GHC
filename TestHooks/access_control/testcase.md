@@ -63,8 +63,10 @@
 | AC-031 | 破壊的コマンド→deny | `run_in_terminal` | `{"command": "rm -rf ./dist"}` | deny ルール `["rm -rf"]` | deny を返す |
 | AC-032 | 大小文字無視マッチ | `run_in_terminal` | `{"command": "RM -RF ./dist"}` | deny ルール `["rm -rf"]` | deny を返す |
 | AC-033 | コマンド不一致→allow | `run_in_terminal` | `{"command": "git status"}` | deny ルール `["rm -rf"]` | `None` を返す |
-| AC-034 | confirm コマンド | `run_in_terminal` | `{"command": "git push --force origin main"}` | confirm ルール `["git push --force"]` | confirm を返す |
+| AC-034 | 強制Git操作→deny | `run_in_terminal` | `{"command": "git push --force origin main"}` | deny ルール `["git push --force"]` | deny を返す |
 | AC-035 | command_patterns 未指定→全マッチ | `run_in_terminal` | `{"command": "any command"}` | deny ルール、when.command_patterns=[] | deny を返す |
+| AC-036 | 危険コマンド取り込み（settings false由来） | `run_in_terminal` | `{"command": "curl https://example.com"}` など | deny ルール `curl` / `Invoke-WebRequest` / `taskkill` / `chmod` / `Invoke-Expression` 等 | deny を返す |
+| AC-037 | 危険オプション取り込み（settings false regex由来） | `run_in_terminal` | `{"command": "date --set 2026-01-01"}` など | deny ルール `date --set` / `find -delete` / `rg --pre` / `sed --expression` / `sort -o` / `tree -o` 等 | deny を返す |
 
 #### 操作タイプ非対応ツール
 

@@ -428,10 +428,10 @@ class TestEvaluateCommandRules(unittest.TestCase):
         ctx = MatchContext(tool_name="run_in_terminal", tool_input={"command": "git status"})
         self.assertIsNone(evaluate(config, ctx))
 
-    def test_AC034_confirm_command(self):
-        """command: git push --force → confirm"""
+    def test_AC034_force_push_deny(self):
+        """command: git push --force → deny"""
         config = _make_config(
-            command_rules=[_confirm_rule("r1", command_patterns=["git push --force"])]
+            command_rules=[_deny_rule("r1", command_patterns=["git push --force"])]
         )
         ctx = MatchContext(
             tool_name="run_in_terminal",
@@ -439,7 +439,43 @@ class TestEvaluateCommandRules(unittest.TestCase):
         )
         result = evaluate(config, ctx)
         self.assertIsNotNone(result)
-        self.assertEqual(result.rule.action, "confirm")
+        self.assertEqual(result.rule.action, "deny")
+
+    def test_AC036_imported_dangerous_patterns_deny(self):
+        """command: settings false 由来の代表パターンが deny になる"""
+        patterns = [
+            "curl ",
+            "Invoke-WebRequest",
+            "taskkill",
+            "chmod ",
+            "Invoke-Expression",
+            "git reset --hard",
+            "find -delete",
+            "rg --pre",
+            "sed --expression",
+            "sort -o",
+            "tree -o",
+        ]
+        config = _make_config(command_rules=[_deny_rule("r1", command_patterns=patterns)])
+        commands = [
+            "curl https://example.com",
+            "Invoke-WebRequest https://example.com",
+            "taskkill /IM node.exe /F",
+            "chmod 755 script.sh",
+            "Invoke-Expression \"Write-Host test\"",
+            "git reset --hard HEAD~1",
+            "find . -delete",
+            "rg --pre ./preprocessor.cmd pattern",
+            "sed --expression s/a/b/ file.txt",
+            "sort -o out.txt in.txt",
+            "tree -o tree.txt",
+        ]
+        for command in commands:
+            with self.subTest(command=command):
+                ctx = MatchContext(tool_name="run_in_terminal", tool_input={"command": command})
+                result = evaluate(config, ctx)
+                self.assertIsNotNone(result)
+                self.assertEqual(result.rule.action, "deny")
 
     def test_AC035_empty_command_patterns_matches_all(self):
         """command: command_patterns 未指定 → 全コマンドにマッチ"""

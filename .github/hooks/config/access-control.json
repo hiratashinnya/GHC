@@ -69,8 +69,16 @@
           "command_patterns": [
             "rm -rf",
             "rm -fr",
+            "rm ",
+            "rmdir ",
+            "del ",
+            "erase ",
             "rd /s /q",
-            "Remove-Item -Recurse -Force"
+            "rd ",
+            "Remove-Item -Recurse -Force",
+            "Remove-Item ",
+            "ri ",
+            "dd "
           ]
         }
       },
@@ -86,9 +94,9 @@
         }
       },
       {
-        "id": "confirm-git-force-push",
-        "description": "Git の強制プッシュ前に確認を求める",
-        "action": "confirm",
+        "id": "deny-git-force-push",
+        "description": "Git の強制プッシュをブロックする",
+        "action": "deny",
         "when": {
           "command_patterns": [
             "git push --force",
@@ -97,12 +105,120 @@
         }
       },
       {
-        "id": "confirm-git-reset-hard",
-        "description": "git reset --hard 前に確認を求める",
-        "action": "confirm",
+        "id": "deny-git-reset-hard",
+        "description": "git reset --hard をブロックする",
+        "action": "deny",
         "when": {
           "command_patterns": [
             "git reset --hard"
+          ]
+        }
+      },
+      {
+        "id": "deny-git-dangerous-options",
+        "description": "Git の危険オプションをブロックする",
+        "action": "deny",
+        "when": {
+          "command_patterns": [
+            "git log --output",
+            "--output=",
+            "git branch -d",
+            "git branch -D",
+            "git branch -m",
+            "git branch -M",
+            "git branch --delete",
+            "git branch --force"
+          ]
+        }
+      },
+      {
+        "id": "deny-process-control-commands",
+        "description": "プロセス制御系コマンドをブロックする",
+        "action": "deny",
+        "when": {
+          "command_patterns": [
+            "kill ",
+            "Stop-Process",
+            "spps",
+            "taskkill",
+            "taskkill.exe",
+            "ps ",
+            "top "
+          ]
+        }
+      },
+      {
+        "id": "deny-network-fetch-commands",
+        "description": "外部通信・取得系コマンドをブロックする",
+        "action": "deny",
+        "when": {
+          "command_patterns": [
+            "curl ",
+            "wget ",
+            "Invoke-RestMethod",
+            "Invoke-WebRequest",
+            "irm ",
+            "iwr "
+          ]
+        }
+      },
+      {
+        "id": "deny-permission-and-property-changes",
+        "description": "権限・属性変更コマンドをブロックする",
+        "action": "deny",
+        "when": {
+          "command_patterns": [
+            "chmod ",
+            "chown ",
+            "Set-ItemProperty",
+            "Set-Acl",
+            "sp "
+          ]
+        }
+      },
+      {
+        "id": "deny-expression-execution",
+        "description": "任意式実行・高リスクパイプ処理をブロックする",
+        "action": "deny",
+        "when": {
+          "command_patterns": [
+            "eval ",
+            "Invoke-Expression",
+            "iex ",
+            "xargs",
+            "jq "
+          ]
+        }
+      },
+      {
+        "id": "deny-dangerous-tool-options",
+        "description": "コマンドの危険オプションをブロックする",
+        "action": "deny",
+        "when": {
+          "command_patterns": [
+            "column -c ",
+            "date -s",
+            "date --set",
+            "find -delete",
+            " -delete",
+            " -exec",
+            " -execdir",
+            " -fprint",
+            " -fprintf",
+            " -fls",
+            " -ok ",
+            " -okdir",
+            "rg --pre",
+            "rg --hostname-bin",
+            "sed -e",
+            "sed -f",
+            "sed --expression",
+            "sed --file",
+            "sed s/",
+            ";W",
+            "sort -o",
+            "sort -S",
+            "tree -o"
           ]
         }
       }
