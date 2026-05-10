@@ -2,10 +2,10 @@
 
 対象スクリプト: `.github/hooks/scripts/access_control.py`
 関連モジュール: `ac_config_loader.py`, `ac_rule_engine.py`
-実行日: 2026-05-09
-コミットID: f952387
+実行日: 2026-05-10
+コミットID: 107af03
 実行コマンド: `python -m unittest test_access_control -v`
-総合結果: **PASS** (51/51)
+総合結果: **PASS** (52/52)
 
 ---
 
@@ -39,7 +39,8 @@
 | AC-031 | TestEvaluateCommandRules | command: `rm -rf` → deny | deny を返す | PASS |
 | AC-032 | TestEvaluateCommandRules | command: 大小文字無視マッチ | deny を返す | PASS |
 | AC-033 | TestEvaluateCommandRules | command: パターン不一致 → allow | `None` | PASS |
-| AC-034 | TestEvaluateCommandRules | command: `git push --force` → confirm | confirm を返す | PASS |
+| AC-034 | TestEvaluateCommandRules | command: `git push --force` → deny | deny を返す | PASS |
+| AC-036 | TestEvaluateCommandRules | command: settings false 由来の危険パターン → deny（11種サブテスト） | 全サブテスト deny を返す | PASS |
 | AC-035 | TestEvaluateCommandRules | command: command_patterns 未指定 → 全マッチ | deny を返す | PASS |
 | AC-040 | TestUnknownTools | 未分類ツール `semantic_search` → allow | `None` | PASS |
 | AC-041 | TestUnknownTools | 未分類ツール `grep_search` → allow | `None` | PASS |
@@ -75,3 +76,4 @@
 | 2 | AC-001〜007 | `AccessControlConfig` の `write_rules` 等が `List[Rule]` → `RuleGroup` に変更 | テスト全件を `.write_rules.rules[0]` 形式に更新、`_make_config()` を `RuleGroup` を返すよう更新 |
 | 3 | AC-004 | `test_AC004` の `def` ヘッダが欠落し AC-003b 内に混入していた | `def test_AC004_empty_rules(self):` ヘッダを独立したメソッドとして復元 |
 | 4 | — | `_get_candidate_rules` が `AccessControlConfig` のフィールド名を直接知っていた（凝集度違反） | `AccessControlConfig.get_group()` メソッドを追加し、`_get_candidate_rules` を thin adapter に変更 |
+| 5 | AC-036 | `find -delete` パターンが `find . -delete` にサブストリング不一致 | テストパターンを ` -delete` に修正（access-control.json と整合） |
