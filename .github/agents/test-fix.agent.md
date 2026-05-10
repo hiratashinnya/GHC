@@ -1,9 +1,8 @@
 ---
-description: "Invoked by prevent-recurrence as a subagent: apply targeted corrections to test-related
+description: "Use when prevent-recurrence delegates phased corrections for test-related
   files (test_*.py, testcase.md, testresult.md) identified in post-incident review,
-  then ask the user whether to run tests and execute them if approved.
-  Designs test corrections autonomously based on findings.
-  Not for direct user invocation. Trigger phrases: (subagent only)"
+   while adversarial handles verification checkpoints. Ask the user about test execution
+   only in the execution phase. Not for direct user invocation. Trigger phrases: (subagent only)"
 name: test-fix
 tools: [read, search, edit, execute, todo, vscode/askQuestions]
 user-invocable: false
@@ -22,24 +21,28 @@ user-invocable: false
 ## 修正手順
 
 1. 呼び出し元から受け取った以下の情報を確認する
+   - `execution_phase`（`phase1_testcase` / `phase2_testcode_commit` / `phase3_test_run_record`）
    - 修正対象ファイルのパス（`test_*.py`, `testcase.md`, `testresult.md` 等）
    - 指摘内容（事実ベース）
    （修正方針は受け取らない — 設計は自律的に判断する）
 2. 対象ファイルを読み、現状と指摘箇所を把握する
-3. `testcase.md` → `test_*.py` の順で整合性を確認しながら修正方針を**自律的に判断する**
-4. 判断した方針に基づき修正を適用する（変更範囲は指摘箇所に限定すること）
-5. 修正後のファイルを読み返し、`testcase.md` ↔ `test_*.py` の整合性（テストケース定義とテストコードの一致）を確認する
-6. 【コミット: テスト実行前に必須（copilot-instructions.md 順守事項7 準拠）】
-   修正した `testcase.md`・`test_*.py` をコミットする
-   （`testresult.md` はテスト実行後に更新するため、この時点では含めない）
-7. `vscode/askQuestions` でテスト実行の意向をユーザーに確認する:
-   - 「テスト関連ファイルの修正が完了しました。テストを実行しますか？」(Yes / No)
-   - **Yes** →
-     a. テストを実行する（対象モジュールのみ、またはフルスイート）
-     b. `git log --oneline -1` でコミットID を取得する
-     c. `testresult.md` を更新する（`実行日:` + `コミットID:` を含める — 順守事項6 準拠）
-     d. `testresult.md` をコミットする
-   - **No** → `testresult.md` は更新しない（テスト後の辻褄合わせ禁止 — 順守事項7 準拠）
-8. 修正結果の要約（変更ファイル・変更箇所・テスト実行結果）を呼び出し元に返す
+
+3. `execution_phase` に応じて実行する:
+   - `phase1_testcase`:
+     - `testcase.md` を修正する（変更範囲は指摘箇所に限定）
+     - 変更内容を呼び出し元へ返す
+   - `phase2_testcode_commit`:
+     - `test_*.py` を修正する（`testcase.md` と対応づける）
+     - 修正した `testcase.md`・`test_*.py` をコミットする（`testresult.md` は含めない）
+     - 変更内容とコミットIDを呼び出し元へ返す
+   - `phase3_test_run_record`:
+     - `vscode/askQuestions` でテスト実行意向を確認する
+     - Yes の場合のみテストを実行する
+     - 実行失敗時は `testresult.md` に FAILED と失敗要因を記録し、再実行するかユーザーに確認する（A+B運用）
+     - `git log --oneline -1` でコミットIDを取得し、`testresult.md` を更新する（`実行日:` + `コミットID:`）
+     - `testresult.md` をコミットし、変更内容とコミットIDを返す
+     - No の場合は `testresult.md` を更新せず、その旨を返す
+
+4. 修正結果の要約（変更ファイル・変更箇所・テスト実行結果）を呼び出し元に返す
 
 > 修正対象が存在しない、または指摘が誤りと判断した場合は、理由を述べて終了する。改めて呼び出し元に判断を委ねること。

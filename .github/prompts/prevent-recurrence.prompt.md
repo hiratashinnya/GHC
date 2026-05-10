@@ -25,12 +25,16 @@ Execute all stages defined in your agent instructions in order without skipping.
 4. After Stage 7: Execute Stage 8.
    - Classify artifacts: test files (`test_*.py`, `testcase.md`, `testresult.md`) → delegate to `test-fix`;
      other artifacts (`docs/`, `src/`) → delegate to `artifact-fix`.
+   - For test files, use interleaved checkpoints: `test-fix` phase execution and adversarial verification must alternate.
    - Pass ONLY: target file paths + Stage 1–2 factual findings. Do NOT include fix policies —
      each subagent designs its own fix approach autonomously.
    - `test-fix` is responsible for asking the user about test execution and running tests if approved.
      Do NOT handle test execution in this agent.
    - Skip Stage 8 and report completion if no artifacts need fixing.
 5. If your agent instructions define artifact verification branches after Stage 8, execute them in order and then produce the final report.
+6. When calling adversarial in Stage V, specify V2 execution mode in the call payload.
+   - Default: v2_execution_mode = parallel
+   - Use sequential only if the user explicitly requests it or a conflict rerun is required.
 
 ### Scope constraints
 
@@ -46,8 +50,13 @@ Execute all stages defined in your agent instructions in order without skipping.
 - Stage 3: always include at least one "do nothing" option in the trade-off table.
 - Stage 4: draft the exact text change (diff style) for each candidate.
 - Stage 5: present the diff clearly and ask for approval with explicit options.
+- Stage 5: do not invoke approval questions before all display requirements are shown.
+- Stage 5 display requirements (mandatory): Stage4 per-file diff, StageV Lv2 details, StageV Lv3 details, decision options with rationale.
+- Stage 5 question format: ask one question per Lv2 finding and one question per Lv3 finding, then ask final approval.
 - Stage 6: read each file before editing; use `todo` to track each change item.
 - Stage 7: trace the prevention logic step-by-step to confirm it covers the reported incident.
 - Stage 7: self-verify all changed files and report per-file PASS/FAIL.
 - Stage 7 self-verification fields: file path, check point, evidence, decision reason.
+- Stage 8 test policy: verification for test corrections must be performed by adversarial checkpoints.
+- Stage 8 test policy: require checkpoint PASS trace for testcase, test code, and testresult.
 - If any file is FAIL in Stage 7, return to Stage 4 and revise before proceeding.

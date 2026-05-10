@@ -3,7 +3,7 @@ description: "Adversarial verification pipeline for prevent-recurrence draft pro
 name: adversarial
 tools: [read, search, edit, todo, agent]
 agents: [perspective-checker]
-user-invocable: true
+user-invocable: false
 ---
 
 あなたは再発防止策草案、および成果物修正の品質を検証する**3段階敵対的検証パイプライン**を実行するエージェントです。
@@ -41,6 +41,7 @@ user-invocable: true
 | `verification_scope` | 省略 = `"customizations"` | `"artifacts"` を明示指定 |
 | 追加情報（artifact のみ） | — | `fixed_subagent`: 対象エージェント（`"artifact-fix"` \| `"test-fix"`） |
 | 追加情報（artifact-fix のみ） | — | `artifact_target_kind`: `"docs"` または `"code"` を呼び出し元が明示 |
+| 追加情報（V2 実行） | prompt 側ポリシーで指定 | `v2_execution_mode`: `"parallel"` または `"sequential"`（未指定は `"parallel"`） |
 | 観点の指定 | 省略時 = customization.md + prevent-recurrence.md | scope に応じて自動選択（後述） |
 
 ## モード別の観点選択（自動）
@@ -143,15 +144,22 @@ V2 へ引き渡す草案（修正なし、検証対象のまま）: {ファイ�
    - `.github/perspectives/prevent-recurrence.md` → P-PR-01〜05
    - `perspective_scope` が指定されている場合はそれに従う
 
-2. **各観点セクションに対して `perspective-checker` サブエージェントを1つずつ呼び出す**:
-   - 呼び出しは順次（次の観点は前の結果を受け取らない — 独立コンテキスト）
+2. `v2_execution_mode` に基づいて `perspective-checker` 呼び出し方式を決定する:
+   - `parallel`（デフォルト）: 観点セクションを並列で呼び出す
+   - `sequential`: 観点セクションを順次で呼び出す
+
+3. **各観点セクションに対して `perspective-checker` サブエージェントを呼び出す**:
+   - どのモードでも「前の観点の判定結果」を次の呼び出しへ渡してはならない（独立性維持）
+   - grouped 運用（既定）: 同一 `perspective_file` 内の呼び出しを同時実行してよい。`perspective-id`を複数指定して呼び出す方式で対応する。
+     - 例: `customization.md` の P-CUS-01〜05 をまとめて呼び出す
+   - strict 運用: 矛盾指摘または Lv3 候補が出た観点群のみ `perspective_id` ごとに完全分離で再評価してよい
    - 各呼び出しに渡す情報:
      - `perspective_file`: 観点ファイルのパス
      - `perspective_id`: 担当セクションID（例: `P-PR-01`）
      - `draft_targets`: V1 修正済み草案のパス一覧
      - `stage1_2_summary`: Stage 1〜2 の事実サマリー
 
-3. 全 `perspective-checker` の結果レポートを収集する
+4. 全 `perspective-checker` の結果レポートを収集する
 
 4. 結果を観点別に整理して出力する:
    ```
@@ -174,15 +182,19 @@ V2 へ引き渡す草案（修正なし、検証対象のまま）: {ファイ�
 - `fixed_subagent` = `"test-fix"` → `.github/perspectives/artifact-tests.md` (P-TST-01〜04)
 
 手順:
-1. 各観点セクションに対して `perspective-checker` をマッピングして順次呼び出す（独立コンテキスト）
-2. 各呼び出しに渡す情報:
+1. `v2_execution_mode` に基づいて `perspective-checker` 呼び出し方式を決定する（デフォルト: `parallel`）
+2. 各観点セクションに対して `perspective-checker` をマッピングして呼び出す
+   - 並列・順次いずれでも「前の観点の判定結果」は次の呼び出しへ渡さない
+   - grouped 運用（既定）: 同一 `perspective_file` 内は並列可
+   - strict 運用: 矛盾指摘または Lv3 候補が出た観点群のみ `perspective_id` ごとに完全分離で再評価可
+3. 各呼び出しに渡す情報:
    - `perspective_file`: 観点ファイルのパス（artifact-docs / artifact-tests / artifact-code）
    - `perspective_id`: セクションID（例: `P-DOC-01`, `P-TST-01`, `P-CODE-01` 等）
    - `draft_targets`: V1 を通した artifact ファイルパス一覧
    - `artifact_context`: artifact が修正対象であること（customization Stage 6-7 とは異なるコンテキスト）
    - `artifact_target_kind`: `docs` / `code` / `tests`（呼び出し元で明示）
 
-3. 全 `perspective-checker` 結果を観点別に整理して出力
+4. 全 `perspective-checker` 結果を観点別に整理して出力
 
 ---
 
@@ -196,7 +208,10 @@ V2 へ引き渡す草案（修正なし、検証対象のまま）: {ファイ�
 手順:
 1. V2 から受け取った全指摘一覧を統合する
 
-2. **重複指摘の除去**: 複数の観点から同一問題が報告された場合、最も Lv が高い方を採用し、1件に統合する
+2. **重複指摘の除去**:
+   - 同一問題は `file_path + check_id` の一致で判定する
+   - 上記が一致しても `evidence_excerpt` が異なる場合は別問題として扱う
+   - 同一問題の複数報告がある場合、最も Lv が高い方を採用し、1件に統合する
 
 3. `severity-triage` スキルを参照し、各指摘の**最終 Lv を確定**する（仮判定を上書き可）
 
@@ -286,6 +301,7 @@ V1（静的検証・Lv1自動修正）→ V2（観点別独立検証、各観点
 ```
 
 - V1 を完了してから V2 に進む（V2 は V1 修正済み草案を対象とする）
-- V2 の各 `perspective-checker` 呼び出しは順次実行（前のレポートを次のサブエージェントに渡さない）
+- V2 の各 `perspective-checker` 呼び出しは `v2_execution_mode` に従う（`parallel` / `sequential`）
+- 並列・順次にかかわらず、前の観点の判定結果を次のサブエージェントへ渡してはならない
 - V3 は全 `perspective-checker` レポートを受け取ってから実行する
 - Lv3 が 1件でも残る場合、レポートに `⛔ ブロック` を明示する（`prevent-recurrence.agent` が Stage 5 の承認フローを調整する）

@@ -115,6 +115,7 @@ agents: [artifact-fix, test-fix, adversarial]
    - `draft_targets`: Stage 4 で作成・変更したファイルのパス一覧
    - `stage1_2_summary`: Stage 1〜2 の事実確認・指摘サマリー
    - `perspective_scope`: 省略（全観点 = `customization.md` + `prevent-recurrence.md` を使用）
+   - `v2_execution_mode`: prompt 側で指定された実行モード（未指定時は `parallel`）
 2. `adversarial.agent` の完了レポートを受け取り確認する
 3. レポートの「ゲート判定」を確認する:
    - `✅ 自動修正完了`: Stage 5 へ進む
@@ -138,6 +139,14 @@ Lv3指摘（ブロック）: N 件
 **目的**: 推奨案をユーザーに提示し、`vscode/askQuestions` ダイアログで承認を得る。
 
 手順:
+0. **表示ゲート検証**を実行する（未達なら `vscode/askQuestions` を呼び出してはならない）:
+   - Stage 1~3 の出力形式がすべて表示済み
+   - Stage 4 の差分（ファイル単位）が表示済み
+   - Stage V の結果（Lv1/Lv2/Lv3件数）が表示済み
+   - Lv2 の各指摘について「概要・根拠・対応案」が表示済み
+   - Lv3 の各指摘について「概要・根拠・選択肢」が表示済み
+   - いずれか欠落した場合は 該当Stage に戻って表示を補完する
+
 1. Stage 4 の推奨案と **Stage V の敵対的検証レポートを合わせて** チャットに提示する
 2. 変更対象ファイルのパス・変更箇所・変更内容（差分形式）を明示する
 3. `vscode/askQuestions` ツールを呼び出す。**Stage V の結果によりダイアログ構成を変える**:
@@ -147,17 +156,31 @@ Lv3指摘（ブロック）: N 件
 {
   "questions": [
     {
-      "header": "lv3_resolution",
-      "question": "⛔ Lv3（人間判断必須）指摘が {N} 件あります。各指摘について選択肢を選んでください（フリーテキストで回答可）。\n{Lv3指摘の選択肢A/B一覧を展開}",
+      "header": "lv3_1",
+      "question": "Lv3 指摘1への対応方針を選択してください",
       "allowFreeformInput": true
     },
     {
+      "header": "lv3_2",
+      "question": "Lv3 指摘2への対応方針を選択してください",
+      "allowFreeformInput": true
+    }
+    // ... Lv3 件数 N に対して lv3_1〜lv3_N を1件1問で生成
+    ,
+    {
+      "header": "lv2_1",
+      "question": "Lv2 指摘1への対応方針を選択してください",
+      "allowFreeformInput": true
+    }
+    // ... Lv2 件数 M に対して lv2_1〜lv2_M を1件1問で生成
+    ,
+    {
       "header": "approval",
-      "question": "Lv3 指摘を全て解決した後、変更を実施してよいですか？",
+      "question": "上記の Lv2/Lv3 方針を反映した変更を実施してよいですか？",
       "options": [
-        { "label": "✅ Lv3解決済み・承認する", "description": "Stage 6（実施）に進む", "recommended": true },
-        { "label": "❌ 却下する",              "description": "変更を中止する" },
-        { "label": "🔄 修正してほしい",        "description": "フリーテキストで修正内容を入力" }
+        { "label": "✅ 承認する",        "description": "Stage 6（実施）に進む", "recommended": true },
+        { "label": "❌ 却下する",        "description": "変更を中止する" },
+        { "label": "🔄 修正してほしい", "description": "フリーテキストで修正内容を入力" }
       ],
       "allowFreeformInput": true
     }
@@ -168,16 +191,25 @@ Lv3指摘（ブロック）: N 件
 **パターンB: Lv3 なし（通常）**
 ```json
 {
-  "questions": [{
-    "header": "approval",
-    "question": "上記の変更を実施してよいですか？",
-    "options": [
-      { "label": "✅ 承認する",        "description": "このまま Stage 6（実施）に進む", "recommended": true },
-      { "label": "❌ 却下する",        "description": "変更を中止する" },
-      { "label": "🔄 修正してほしい", "description": "フリーテキストで修正内容を入力" }
-    ],
-    "allowFreeformInput": true
-  }]
+  "questions": [
+    {
+      "header": "lv2_1",
+      "question": "Lv2 指摘1への対応方針を選択してください",
+      "allowFreeformInput": true
+    }
+    // ... Lv2 件数 M に対して lv2_1〜lv2_M を1件1問で生成
+    ,
+    {
+      "header": "approval",
+      "question": "上記の Lv2 方針を反映した変更を実施してよいですか？",
+      "options": [
+        { "label": "✅ 承認する",        "description": "このまま Stage 6（実施）に進む", "recommended": true },
+        { "label": "❌ 却下する",        "description": "変更を中止する" },
+        { "label": "🔄 修正してほしい", "description": "フリーテキストで修正内容を入力" }
+      ],
+      "allowFreeformInput": true
+    }
+  ]
 }
 ```
 
@@ -242,7 +274,14 @@ Lv3指摘（ブロック）: N 件
 4. 対象種別に応じて subagent を順次呼び出す:
    - `artifact-fix` → その他成果物の修正とコミット（対象がある場合のみ）
    - `artifact-fix` の完了報告を受けてから次へ進む（修正成果物がコミット済みであることを確認）
-   - `test-fix` → テスト関連ファイルの修正とテスト実行確認（対象がある場合のみ）
+  - `test-fix` と `adversarial` を交互に呼び出す checkpoint 方式で進める（対象がある場合のみ）
+    - `test-fix` `phase1_testcase`（testcase修正のみ）
+    - Stage 8-V-B checkpoint-1（`adversarial` で testcase を検証）
+    - `test-fix` `phase2_testcode_commit`（test code修正とコミット）
+    - Stage 8-V-B checkpoint-2（`adversarial` で testcase+test code を検証）
+    - `test-fix` `phase3_test_run_record`（ユーザー承認取得、テスト実行、testresult更新とコミット）
+    - Stage 8-V-B checkpoint-3（`adversarial` で testresult を検証）
+  - テスト修正の検証主体は常に `adversarial` とし、`test-fix` に自己検証をさせない
 5. 全 subagent の完了報告を受け、修正結果をユーザーに提示して終了する
 
 ---
@@ -280,20 +319,29 @@ Lv3指摘（ブロック）: N 件
 **目的**: `test-fix` が修正した testcase.md, test_*.py, testresult.md に対して敵対的検証を実施し、テスト品質を確保する。
 
 前提条件:
-- Stage 8 の `test-fix` subagent がテスト関連ファイルの修正とテスト実行を完了していること
-- testresult.md が最新の実行結果で更新されていること
+- Stage 8 の `test-fix` subagent が以下を完了していること:
+  - checkpoint-1 前: testcase 修正が完了していること
+  - checkpoint-2 前: test code 修正と事前コミットが完了していること
+  - checkpoint-3 前: ユーザー承認後のテスト実行と testresult.md 更新が完了していること
+  - 各 checkpoint の開始条件として、直前 checkpoint が PASS（Lv3=0）であること
 
 手順:
-1. `test-fix` から受け取ったテスト修正ファイル情報を整理する（testcase.md, test_*.py, testresult.md）
-2. `adversarial` subagent を呼び出す:
-   - `verification_scope`: `"artifacts"`
-   - `fixed_subagent`: `"test-fix"`
-   - `draft_targets`: テスト関連ファイルのパス一覧（コミット ID 付き）
-3. `adversarial` から返されたレポートを解析する:
-   - **Lv1**: `test-fix` に再委託（指摘内容を共有）
-   - **Lv2**: テスト設計の提案をユーザーに共有（情報提供）
-   - **Lv3**: ブロック状態として記録
-4. Lv1 の再委託が完了したら次ステージへ進む（最大 1 cycle）
+1. checkpoint-1（testcase）を実行する:
+  - `adversarial` subagent を呼び出す（`verification_scope`: `"artifacts"`, `fixed_subagent`: `"test-fix"`）
+  - `draft_targets`: testcase.md（コミットIDがある場合は併記）
+2. checkpoint-1 の結果を解析する:
+  - **Lv1**: `test-fix` に再委託（最大 1 cycle）
+  - **Lv2**: 提案として記録し次へ進む
+  - **Lv3**: ブロックして人間判断を要求
+3. checkpoint-2（testcase + test code）を実行する:
+  - `adversarial` subagent を呼び出す
+  - `draft_targets`: testcase.md, test_*.py（コミットID必須）
+4. checkpoint-2 の結果を解析する（判定ルールは checkpoint-1 と同じ）
+5. checkpoint-3（testresult）を実行する:
+  - `adversarial` subagent を呼び出す
+  - `draft_targets`: testresult.md + 関連 test_*.py/testcase.md（最新コミットID付き）
+6. checkpoint-3 の結果を解析する（判定ルールは checkpoint-1 と同じ）
+7. 3つの checkpoint がすべて PASS（Lv3=0）なら次ステージへ進む
 
 ---
 
