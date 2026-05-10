@@ -450,7 +450,7 @@ class TestEvaluateCommandRules(unittest.TestCase):
             "chmod ",
             "Invoke-Expression",
             "git reset --hard",
-            "find -delete",
+            " -delete",
             "rg --pre",
             "sed --expression",
             "sort -o",
