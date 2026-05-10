@@ -247,10 +247,57 @@ Lv3指摘（ブロック）: N 件
 
 ---
 
+### Stage 8-V-A — 成果物（docs/src）修正の敵対的検証
+
+**目的**: `artifact-fix` が修正した docs/, src/ ファイルに対して敵対的検証（V1→V2→V3）を実施し、修正品質を確保する。
+
+前提条件:
+- Stage 8 の `artifact-fix` subagent が成果物修正を完了し、コミット済みであること
+- 修正対象ファイルが存在すること
+
+手順:
+1. `artifact-fix` から受け取った修正ファイル一覧を整理する（docs/ ファイル、src/ コード等）
+2. 修正ファイルの種別を判定する:
+   - ドキュメント（`.md`, `.txt` 等）→ `artifact-docs` 観点を適用
+   - ソースコード（`.py`, `.ts` 等）→ `artifact-code` 観点を適用
+3. `adversarial` subagent を呼び出す:
+   - `verification_scope`: `"artifacts"`
+   - `fixed_subagent`: `"artifact-fix"`
+   - `draft_targets`: 修正ファイルのパス一覧（実際の git commit ID と一緒に提供）
+4. `adversarial` から返されたレポートを解析する:
+   - **Lv1（再委託対象）**: `artifact-fix` に再度呼び出す。指摘内容と再委託フラグを共有
+   - **Lv2**: 修正提案をユーザーに提示（情報提供）
+   - **Lv3**: ブロック状態として記録。人間判断が必須（Stage 9 のレビューに含める）
+5. Lv1 の再委託サイクルが 1 回完了したら、`artifact-fix` の修正スコープを把握して次へ進む（無限ループ防止：最大 1 cycle）
+
+---
+
+### Stage 8-V-B — テスト修正の敵対的検証
+
+**目的**: `test-fix` が修正した testcase.md, test_*.py, testresult.md に対して敵対的検証を実施し、テスト品質を確保する。
+
+前提条件:
+- Stage 8 の `test-fix` subagent がテスト関連ファイルの修正とテスト実行を完了していること
+- testresult.md が最新の実行結果で更新されていること
+
+手順:
+1. `test-fix` から受け取ったテスト修正ファイル情報を整理する（testcase.md, test_*.py, testresult.md）
+2. `adversarial` subagent を呼び出す:
+   - `verification_scope`: `"artifacts"`
+   - `fixed_subagent`: `"test-fix"`
+   - `draft_targets`: テスト関連ファイルのパス一覧（コミット ID 付き）
+3. `adversarial` から返されたレポートを解析する:
+   - **Lv1**: `test-fix` に再委託（指摘内容を共有）
+   - **Lv2**: テスト設計の提案をユーザーに共有（情報提供）
+   - **Lv3**: ブロック状態として記録
+4. Lv1 の再委託が完了したら次ステージへ進む（最大 1 cycle）
+
+---
+
 ## 実施順序の強制ルール
 
 ```
-Stage 1 → 2 → 3 → 4 → V（adversarial 検証）→ 5（停止・承認待ち）→ 6 → 7 → 8（成果物修正 or スキップ）
+Stage 1 → 2 → 3 → 4 → V（customization 検証）→ 5（停止・承認待ち）→ 6 → 7 → 8（成果物修正 or スキップ）→ 8-V-A（docs/src 検証）→ 8-V-B（test 検証）→ 9（最終報告）
 ```
 
 - ステージを飛ばしてはならない
@@ -259,3 +306,6 @@ Stage 1 → 2 → 3 → 4 → V（adversarial 検証）→ 5（停止・承認�
 - Stage 5 でユーザーの承認を得るまで Stage 6 に進んではならない
 - 各ステージの出力を省略してはならない（短縮可だが内容は省略不可）
 - Stage 8 は成果物修正が不要な場合スキップしてよい（スキップ理由を報告すること）
+- Stage 8-V-A / 8-V-B は Stage 8 で修正対象があった場合のみ実行する（修正なし = スキップ）
+- Stage 8-V-A / 8-V-B での Lv1 再委託は最大 1 cycle とする（無限ループ防止）
+- Stage 8-V-A / 8-V-B での Lv3 指摘は Stage 9 最終報告でユーザーに通知する（Stage 5 とは異なり、ブロック状態ではなく「重要情報」として扱う）
