@@ -35,6 +35,16 @@
             "iter/**"
           ]
         }
+      },
+      {
+        "id": "confirm-access-control-config-write",
+        "description": "access-control.json への書き込みはエージェントスコープ機能追加後に confirm に昇格予定",
+        "action": "disabled",
+        "when": {
+          "path_patterns": [
+            ".github/hooks/config/access-control.json"
+          ]
+        }
       }
     ]
   },
@@ -95,12 +105,14 @@
       },
       {
         "id": "deny-git-force-push",
-        "description": "Git の強制プッシュをブロックする",
+        "description": "Git の push / clone 操作をブロックする",
         "action": "deny",
         "when": {
           "command_patterns": [
+            "git push ",
             "git push --force",
-            "git push -f "
+            "git push -f ",
+            "git clone"
           ]
         }
       },
@@ -187,6 +199,21 @@
             "iex ",
             "xargs",
             "jq "
+          ]
+        }
+      },
+      {
+        "id": "deny-package-install",
+        "description": "外部パッケージのインストールコマンドをブロックする",
+        "action": "deny",
+        "when": {
+          "command_patterns": [
+            "pip install",
+            "pip3 install",
+            "conda install",
+            "poetry add",
+            "pipenv install",
+            "pipx install"
           ]
         }
       },

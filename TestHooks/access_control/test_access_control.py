@@ -477,6 +477,50 @@ class TestEvaluateCommandRules(unittest.TestCase):
                 self.assertIsNotNone(result)
                 self.assertEqual(result.rule.action, "deny")
 
+    def test_AC038_package_install_deny(self):
+        """command: pip/conda/poetry install → deny"""
+        patterns = [
+            "pip install",
+            "pip3 install",
+            "conda install",
+            "poetry add",
+            "pipenv install",
+            "pipx install",
+        ]
+        config = _make_config(command_rules=[_deny_rule("r1", command_patterns=patterns)])
+        commands = [
+            "pip install requests",
+            "pip3 install numpy",
+            "conda install pandas",
+            "poetry add fastapi",
+            "pipenv install flask",
+            "pipx install black",
+        ]
+        for command in commands:
+            with self.subTest(command=command):
+                ctx = MatchContext(tool_name="run_in_terminal", tool_input={"command": command})
+                result = evaluate(config, ctx)
+                self.assertIsNotNone(result)
+                self.assertEqual(result.rule.action, "deny")
+
+    def test_AC039_git_push_clone_deny(self):
+        """command: git push / git clone → deny"""
+        config = _make_config(
+            command_rules=[_deny_rule("r1", command_patterns=["git push ", "git clone"])]
+        )
+        commands = [
+            "git push origin main",
+            "git push --force origin main",
+            "git clone https://github.com/example/repo.git",
+            "git clone git@github.com:example/repo.git",
+        ]
+        for command in commands:
+            with self.subTest(command=command):
+                ctx = MatchContext(tool_name="run_in_terminal", tool_input={"command": command})
+                result = evaluate(config, ctx)
+                self.assertIsNotNone(result)
+                self.assertEqual(result.rule.action, "deny")
+
     def test_AC035_empty_command_patterns_matches_all(self):
         """command: command_patterns 未指定 → 全コマンドにマッチ"""
         config = _make_config(

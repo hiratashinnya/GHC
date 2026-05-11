@@ -67,6 +67,8 @@
 | AC-035 | command_patterns 未指定→全マッチ | `run_in_terminal` | `{"command": "any command"}` | deny ルール、when.command_patterns=[] | deny を返す |
 | AC-036 | 危険コマンド取り込み（settings false由来） | `run_in_terminal` | `{"command": "curl https://example.com"}` など | deny ルール `curl` / `Invoke-WebRequest` / `taskkill` / `chmod` / `Invoke-Expression` 等 | deny を返す |
 | AC-037 | 危険オプション取り込み（settings false regex由来） | `run_in_terminal` | `{"command": "date --set 2026-01-01"}` など | deny ルール `date --set` / `find -delete` / `rg --pre` / `sed --expression` / `sort -o` / `tree -o` 等 | deny を返す |
+| AC-038 | パッケージインストール→deny | `run_in_terminal` | `{"command": "pip install requests"}` など | deny ルール `pip install` / `pip3 install` / `conda install` / `poetry add` / `pipenv install` / `pipx install` | deny を返す |
+| AC-039 | git clone / git push（全般）→deny | `run_in_terminal` | `{"command": "git push origin main"}` / `{"command": "git clone https://..."}` | deny ルール `git push ` / `git clone` | deny を返す |
 
 #### 操作タイプ非対応ツール
 
