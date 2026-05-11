@@ -521,6 +521,54 @@ class TestEvaluateCommandRules(unittest.TestCase):
                 self.assertIsNotNone(result)
                 self.assertEqual(result.rule.action, "deny")
 
+    def test_AC042_powershell_linux_install_deny(self):
+        """command: PowerShell/Linux/Node package install commands → deny"""
+        patterns = [
+            "Install-Module",
+            "Install-Package",
+            "winget install",
+            "choco install",
+            "scoop install",
+            "apt install",
+            "apt-get install",
+            "yum install",
+            "dnf install",
+            "pacman -S",
+            "zypper install",
+            "apk add",
+            "brew install",
+            "snap install",
+            "npm install",
+            "yarn add",
+            "pnpm add",
+        ]
+        config = _make_config(command_rules=[_deny_rule("r1", command_patterns=patterns)])
+        commands = [
+            "Install-Module Pester",
+            "Install-Package Pester",
+            "winget install Git.Git",
+            "choco install git",
+            "scoop install git",
+            "apt install git",
+            "apt-get install git",
+            "yum install git",
+            "dnf install git",
+            "pacman -S git",
+            "zypper install git",
+            "apk add git",
+            "brew install git",
+            "snap install code",
+            "npm install lodash",
+            "yarn add react",
+            "pnpm add axios",
+        ]
+        for command in commands:
+            with self.subTest(command=command):
+                ctx = MatchContext(tool_name="run_in_terminal", tool_input={"command": command})
+                result = evaluate(config, ctx)
+                self.assertIsNotNone(result)
+                self.assertEqual(result.rule.action, "deny")
+
     def test_AC035_empty_command_patterns_matches_all(self):
         """command: command_patterns 未指定 → 全コマンドにマッチ"""
         config = _make_config(

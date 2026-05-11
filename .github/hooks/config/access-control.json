@@ -204,7 +204,7 @@
       },
       {
         "id": "deny-package-install",
-        "description": "外部パッケージのインストールコマンドをブロックする",
+        "description": "外部パッケージのインストールコマンド（PowerShell/Linux/各種PM）をブロックする",
         "action": "deny",
         "when": {
           "command_patterns": [
@@ -213,7 +213,24 @@
             "conda install",
             "poetry add",
             "pipenv install",
-            "pipx install"
+            "pipx install",
+            "Install-Module",
+            "Install-Package",
+            "winget install",
+            "choco install",
+            "scoop install",
+            "apt install",
+            "apt-get install",
+            "yum install",
+            "dnf install",
+            "pacman -S",
+            "zypper install",
+            "apk add",
+            "brew install",
+            "snap install",
+            "npm install",
+            "yarn add",
+            "pnpm add"
           ]
         }
       },

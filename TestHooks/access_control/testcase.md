@@ -69,6 +69,7 @@
 | AC-037 | 危険オプション取り込み（settings false regex由来） | `run_in_terminal` | `{"command": "date --set 2026-01-01"}` など | deny ルール `date --set` / `find -delete` / `rg --pre` / `sed --expression` / `sort -o` / `tree -o` 等 | deny を返す |
 | AC-038 | パッケージインストール→deny | `run_in_terminal` | `{"command": "pip install requests"}` など | deny ルール `pip install` / `pip3 install` / `conda install` / `poetry add` / `pipenv install` / `pipx install` | deny を返す |
 | AC-039 | git clone / git push（全般）→deny | `run_in_terminal` | `{"command": "git push origin main"}` / `{"command": "git clone https://..."}` | deny ルール `git push ` / `git clone` | deny を返す |
+| AC-042 | PowerShell/Linux系インストール→deny | `run_in_terminal` | `{"command": "Install-Module Pester"}` / `{"command": "apt install git"}` など | deny ルール `Install-Module` / `Install-Package` / `winget install` / `choco install` / `scoop install` / `apt install` / `apt-get install` / `yum install` / `dnf install` / `pacman -S` / `zypper install` / `apk add` / `brew install` / `snap install` / `npm install` / `yarn add` / `pnpm add` | deny を返す |
 
 #### 操作タイプ非対応ツール
 
