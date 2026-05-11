@@ -1,10 +1,10 @@
 # testresult: hook_payload.py
 
 対象スクリプト: `.github/hooks/scripts/hook_payload.py`
-実行日: 2026-05-06
-コミットID: 32ed3c0
+実行日: 2026-05-11
+コミットID: a41de1e
 実行コマンド: `python -m unittest test_hook_payload -v`
-総合結果: **PASS** (49/49)
+総合結果: **PASS** (53/53)
 
 ---
 
@@ -61,7 +61,7 @@
 | HP-047 | `add_context` on PostToolUse | `text="t"` | stdout に `hookSpecificOutput.hookEventName:"PostToolUse"` + `additionalContext:"t"` が出力される | 期待 JSON 一致 | PASS |
 | HP-048 | `add_context` on SessionStart | `text="t"` | stdout に `hookSpecificOutput.hookEventName:"SessionStart"` + `additionalContext:"t"` が出力される | 期待 JSON 一致 | PASS |
 | HP-049 | `add_context` on SubagentStart | `text="t"` | stdout に `hookSpecificOutput.hookEventName:"SubagentStart"` + `additionalContext:"t"` が出力される | 期待 JSON 一致 | PASS |
-| HP-050 | `read_payload` cp932 エンコーディング | cp932 でエンコードされた JSON バイト列（日本語含む） | dict を正常に返す（文字化けなし） | - | - |
-| HP-051 | `read_payload` OSError 時の stderr 出力 | `stdin.buffer.read` が `OSError` を送出 | `{}` を返し、stderr に `"stdin read error"` を含むメッセージが出力される | - | - |
-| HP-052 | `read_payload` 無効 JSON 時の stderr 出力 | バイト列 `"not valid json"` | `{}` を返し、stderr に `"JSON parse error"` を含むメッセージが出力される | - | - |
-| HP-053 | `read_payload` デコード不可バイト列 | UTF-8 / cp932 どちらでもデコード不可なバイト列 | `{}` を返す（クラッシュしない） | - | - |
+| HP-050 | `read_payload` cp932 エンコーディング | cp932 でエンコードされた JSON バイト列（日本語含む） | dict を正常に返す（文字化けなし） | `{"hookEventName": "PreToolUse", "prompt": "テスト"}` | PASS |
+| HP-051 | `read_payload` OSError 時の stderr 出力 | `stdin.buffer.read` が `OSError` を送出 | `{}` を返し、stderr に `"stdin read error"` を含むメッセージが出力される | 期待通り | PASS |
+| HP-052 | `read_payload` 無効 JSON 時の stderr 出力 | バイト列 `"not valid json"` | `{}` を返し、stderr に `"JSON parse error"` を含むメッセージが出力される | 期待通り | PASS |
+| HP-053 | `read_payload` デコード不可バイト列 | UTF-8 / cp932 どちらでもデコード不可なバイト列 | `{}` を返す（クラッシュしない） | `{}` | PASS |
