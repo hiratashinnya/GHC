@@ -193,6 +193,55 @@ class TestReadPayload(unittest.TestCase):
             result = read_payload()
         self.assertEqual(result, {})
 
+    def test_HP050_cp932_encoded_payload(self):
+        """cp932 エンコードのペイロードを正常にデコードできることを確認。"""
+        payload = {"hookEventName": "PreToolUse", "prompt": "テスト"}
+        raw_bytes = json.dumps(payload, ensure_ascii=False).encode("cp932")
+        mock = MagicMock()
+        mock.isatty.return_value = False
+        mock.buffer.read.return_value = raw_bytes
+        with patch("hook_payload.sys.stdin", mock):
+            result = read_payload()
+        self.assertEqual(result["hookEventName"], "PreToolUse")
+        self.assertEqual(result["prompt"], "テスト")
+
+    def test_HP051_stdin_os_error_writes_stderr(self):
+        """OSError 発生時に stderr にエラーメッセージを出力することを確認。"""
+        mock = MagicMock()
+        mock.isatty.return_value = False
+        mock.buffer.read.side_effect = OSError("pipe broken")
+        buf = io.StringIO()
+        with patch("hook_payload.sys.stdin", mock), patch("hook_payload.sys.stderr", buf):
+            result = read_payload()
+        self.assertEqual(result, {})
+        self.assertIn("stdin read error", buf.getvalue())
+
+    def test_HP052_invalid_json_writes_stderr(self):
+        """JSON パースエラー時に stderr にエラーメッセージを出力することを確認。"""
+        mock = MagicMock()
+        mock.isatty.return_value = False
+        mock.buffer.read.return_value = b"not valid json"
+        buf = io.StringIO()
+        with patch("hook_payload.sys.stdin", mock), patch("hook_payload.sys.stderr", buf):
+            result = read_payload()
+        self.assertEqual(result, {})
+        self.assertIn("JSON parse error", buf.getvalue())
+
+    def test_HP053_undecodable_bytes_returns_empty(self):
+        """UTF-8/cp932 どちらでもデコードできないバイト列は {} を返ず。"""
+        # 0x80つ0x9fは cp932 の有効範囲の一部だが、UTF-8 の続バイトを持たないので
+        # 両エンコードが失敗させるために e0 80 80 を使う
+        raw_bytes = b"\xe0\x80\x80"  # over-long UTF-8; invalid in both utf-8 and cp932 as JSON
+        mock = MagicMock()
+        mock.isatty.return_value = False
+        mock.buffer.read.return_value = raw_bytes
+        buf = io.StringIO()
+        with patch("hook_payload.sys.stdin", mock), patch("hook_payload.sys.stderr", buf):
+            result = read_payload()
+        # Over-long UTF-8 bytes decoded via cp932 would produce garbled JSON -> {} expected
+        # OR if both fail -> replacement characters -> JSON error -> {}
+        self.assertEqual(result, {})
+
 
 # ---------------------------------------------------------------------------
 # Output method tests (moved from test_hook_output.py: HO-001 -> HP-024 etc.)

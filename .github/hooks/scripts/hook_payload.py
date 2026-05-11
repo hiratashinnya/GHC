@@ -37,29 +37,56 @@ def _emit(data: Dict) -> None:
 # stdin helper
 # ---------------------------------------------------------------------------
 
+_DECODE_CHAIN = ("utf-8", "cp932")
+
+
 def read_payload() -> Dict:
     """Read the hook payload from stdin and return as a plain dict.
 
     Returns an empty dict when stdin is a TTY (manual / interactive run),
     on read error, or when the payload is not valid JSON.
 
-    Reads via sys.stdin.buffer to ensure UTF-8 decoding regardless of the
-    platform default encoding (e.g. cp932 on Japanese Windows). VS Code hook
-    runners always send the payload as UTF-8 bytes; reading through the text
-    layer with a non-UTF-8 locale would introduce surrogate-escaped characters
-    that later cause UnicodeEncodeError when writing to log files.
+    Decoding strategy (standard library only, no chardet):
+    1. Try UTF-8 — VS Code hook runners always send UTF-8 bytes.
+    2. Fall back to cp932 — Japanese Windows default locale.
+    3. Last resort: UTF-8 with errors="replace" (payload may be garbled but
+       never raises; the subsequent json.loads will likely fail and trigger the
+       JSONDecodeError path).
+
+    Errors are written to stderr so they surface as model context.
     """
     if sys.stdin.isatty():
         return {}
     try:
-        raw = sys.stdin.buffer.read().decode("utf-8").strip()
-    except OSError:
+        raw_bytes = sys.stdin.buffer.read()
+    except OSError as exc:
+        print(f"[hook_payload] stdin read error: {exc}", file=sys.stderr)
         return {}
+    if not raw_bytes:
+        return {}
+
+    raw: str = ""
+    for enc in _DECODE_CHAIN:
+        try:
+            raw = raw_bytes.decode(enc).strip()
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        # All encodings failed — decode with replacement characters as last resort
+        raw = raw_bytes.decode("utf-8", errors="replace").strip()
+        print(
+            f"[hook_payload] payload decoding failed for all encodings "
+            f"{_DECODE_CHAIN}; decoded with replacement characters",
+            file=sys.stderr,
+        )
+
     if not raw:
         return {}
     try:
         return json.loads(raw)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
+        print(f"[hook_payload] JSON parse error: {exc}", file=sys.stderr)
         return {}
 
 

@@ -144,7 +144,8 @@ def _scalar(raw: str):
 def parse_frontmatter(path: Path) -> Optional[Dict[str, Any]]:
     try:
         text = path.read_text(encoding="utf-8")
-    except OSError:
+    except OSError as exc:
+        DEBUG.log("parse_frontmatter: OSError", path=str(path), error=str(exc))
         return None
 
     m = re.match(r"^---[ \t]*\r?\n(.*?)\r?\n---", text, re.DOTALL)
