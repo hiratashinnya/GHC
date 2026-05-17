@@ -816,6 +816,63 @@ class TestDispatchAction(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Command pattern regex matching tests
+# ---------------------------------------------------------------------------
+
+class TestCommandPatternRegex(unittest.TestCase):
+    """Tests for _match_command_patterns with regex support"""
+
+    def test_AC092_git_add_no_false_positive_with_dd_word_boundary(self):
+        """AC-092: "git add file.txt" should not match \\bdd\\b pattern (word boundary precision)"""
+        patterns = [r"\bdd\b", r"\brm\b"]
+        command = "git add file.txt"
+        matched = _match_command_patterns(patterns, command, debug=None)
+        self.assertEqual(matched, [])
+
+    def test_AC093_dd_command_matches_word_boundary_pattern(self):
+        """AC-093: "dd if=/dev/zero" should match \\bdd\\b pattern"""
+        patterns = [r"\bdd\b"]
+        command = "dd if=/dev/zero"
+        matched = _match_command_patterns(patterns, command, debug=None)
+        self.assertEqual(matched, [r"\bdd\b"])
+
+    def test_AC093b_deadline_not_match_dd_word_boundary(self):
+        """AC-093b: "deadline-2026-01-01" should NOT match \\bdd\\b (word boundary prevents substring match)"""
+        patterns = [r"\bdd\b"]
+        command = "deadline-2026-01-01"
+        matched = _match_command_patterns(patterns, command, debug=None)
+        self.assertEqual(matched, [])
+
+    def test_AC094_invalid_regex_skipped_and_logged(self):
+        """AC-094: Invalid regex patterns are skipped; errors logged to debug.log"""
+        patterns = [r"\bdd\b", r"[invalid(regex"]
+        command = "rm -rf"
+        mock_debug = MagicMock()
+        matched = _match_command_patterns(patterns, command, debug=mock_debug)
+        # Only valid pattern is processed; invalid one triggers debug log call
+        self.assertNotIn(r"[invalid(regex", matched)
+        mock_debug.log.assert_called_once()
+        call_args = mock_debug.log.call_args
+        self.assertEqual(call_args[1].get("log_type"), "regex_error")
+
+    def test_AC095_multiple_patterns_all_matches_returned(self):
+        """AC-095: Multiple matching patterns all returned in result"""
+        patterns = [r"\brm\b", r"\bdd\b", "dev-null"]
+        command = "rm -rf ./dist"
+        matched = _match_command_patterns(patterns, command, debug=None)
+        self.assertIn(r"\brm\b", matched)
+        self.assertNotIn(r"\bdd\b", matched)
+        self.assertNotIn("dev-null", matched)
+
+    def test_AC096_case_insensitive_regex_match(self):
+        """AC-096: Regex matching is case-insensitive (IGNORECASE)"""
+        patterns = [r"\bDD\b"]
+        command = "dd if=/dev/zero"
+        matched = _match_command_patterns(patterns, command, debug=None)
+        self.assertEqual(matched, [r"\bDD\b"])
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 

@@ -40,6 +40,8 @@ from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional
 
 from ac_config_loader import AccessControlConfig, Rule
+import re
+from debug_logging import HookDebugLogger
 
 # ---------------------------------------------------------------------------
 # Tool classification
@@ -181,15 +183,24 @@ def _match_path_patterns(patterns: List[str], paths: List[str], cwd: str) -> Lis
     return matched
 
 
-def _match_command_patterns(patterns: List[str], command: str) -> List[str]:
-    """command 文字列に含まれるパターン（部分一致・大小文字無視）のリストを返す。"""
-    return [p for p in patterns if p.lower() in command.lower()]
+def _match_command_patterns(patterns: List[str], command: str, debug: Optional[HookDebugLogger] = None) -> List[str]:
+    """Command patterns are matched as regexes with IGNORECASE flag."""
+    matched = []
+    for pattern in patterns:
+        try:
+            if re.search(pattern, command, re.IGNORECASE):
+                matched.append(pattern)
+        except re.error as exc:
+            if debug:
+                debug.log("regex_error", log_type="regex_error", pattern=pattern, error=str(exc))
+    return matched
 
 
 def _matches_rule(
     rule: Rule,
     context: MatchContext,
     operation_type: str,
+    debug: Optional[HookDebugLogger] = None,
 ) -> Optional[RuleMatch]:
     """ルールがコンテキストにマッチするか判定する。マッチすれば RuleMatch を返す。
 
@@ -212,7 +223,7 @@ def _matches_rule(
     if operation_type == "command":
         command = _get_command_from_tool_input(context.tool_input)
         if when.command_patterns:
-            matched_patterns = _match_command_patterns(when.command_patterns, command)
+            matched_patterns = _match_command_patterns(when.command_patterns, command, debug=debug)
             if matched_patterns:
                 return RuleMatch(rule=rule, matched_values=matched_patterns)
             return None
@@ -247,7 +258,7 @@ def _get_candidate_rules(config: AccessControlConfig, operation_type: str) -> Li
 # Public API
 # ---------------------------------------------------------------------------
 
-def evaluate(config: AccessControlConfig, context: MatchContext) -> Optional[RuleMatch]:
+def evaluate(config: AccessControlConfig, context: MatchContext, debug: Optional[HookDebugLogger] = None) -> Optional[RuleMatch]:
     """適用すべきルールを評価し、優先度が最も高いマッチを返す。
 
     評価順序:
@@ -278,7 +289,7 @@ def evaluate(config: AccessControlConfig, context: MatchContext) -> Optional[Rul
     for rule in candidates:
         if not rule.is_active():
             continue
-        match = _matches_rule(rule, context, operation_type)
+        match = _matches_rule(rule, context, operation_type, debug=debug)
         if match:
             active_matches.append(match)
 

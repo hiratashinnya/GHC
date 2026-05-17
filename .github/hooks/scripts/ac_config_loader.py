@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
@@ -136,7 +137,15 @@ def _parse_rule_list(raw_list: object, errors: List[str]) -> List[Rule]:
         if not isinstance(item, dict):
             continue
         try:
-            rules.append(_parse_rule(item))
+            rule = _parse_rule(item)
+            # Validate command_patterns as regex
+            rule_id = item.get("id", "(unknown)")
+            for pattern in rule.when.command_patterns:
+                try:
+                    re.compile(pattern)
+                except re.error as exc:
+                    errors.append(f"invalid regex in rule {rule_id}: {pattern} - {exc}")
+            rules.append(rule)
         except ValueError as exc:
             # 不正なルールはスキップし、エラー内容を errors に収集してユーザーへの通知に使う
             errors.append(str(exc))

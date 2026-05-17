@@ -122,3 +122,16 @@
 | AC-089 | action="confirm" → ask 発火 | confirm の `RuleMatch` | `""` | `event.ask(reason)` 呼び出して `sys.exit(0)` |
 | AC-090 | action="allow" + warning なし → 何もしない | allow の `RuleMatch` | `""` | sys.exit されない。event のメソッド呼ばれない |
 | AC-091 | action="allow" + warning あり → warn 発火（リグレッション） | allow の `RuleMatch` | `"⚠ bad rules"` | `event.warn()` 呼び出して `sys.exit(0)`（旧バグ: 握りつぶしていた） |
+
+### コマンドパターン — 正規表現マッチング
+
+#### ac_rule_engine.py — _match_command_patterns(patterns, command, debug)
+
+| テストID | 観点 | patterns | command | 期待動作 |
+|----------|------|----------|---------|----------|
+| AC-092 | git add が dd false positive を回避 | `["\\bdd\\b", "\\brm\\b"]` | `"git add file.txt"` | `[]` を返す（どのパターンにもマッチしない） |
+| AC-093 | dd 単語が \b で厳密マッチ | `["\\bdd\\b"]` | `"dd if=/dev/zero"` | `["\\bdd\\b"]` を返す |
+| AC-093b | deadline が \b で非マッチ | `["\\bdd\\b"]` | `"deadline-2026-01-01"` | `[]` を返す |
+| AC-094 | 無効な regex パターンが debug ログに記録される | `["\\bdd\\b", "[invalid(regex"]` | `"rm -rf"` | マッチ結果に `[invalid(regex` は含まれず（skip）、debug.log に regex error が記録される |
+| AC-095 | 複数の有効パターンor マッチ | `["\\brm\\b", "\\bdd\\b", "dev-null"]` | `"rm -rf ./dist"` | `["\\brm\\b"]` を返す（複数マッチは全て返す） |
+| AC-096 | 大小文字無視マッチ | `["\\bDD\\b"]` | `"dd if=/dev/zero"` | `["\\bDD\\b"]` を返す（IGNORECASE で小文字dd がマッチ） |

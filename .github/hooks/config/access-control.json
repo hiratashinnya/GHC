@@ -77,18 +77,18 @@
         "action": "deny",
         "when": {
           "command_patterns": [
-            "rm -rf",
-            "rm -fr",
-            "rm ",
-            "rmdir ",
-            "del ",
-            "erase ",
-            "rd /s /q",
-            "rd ",
-            "Remove-Item -Recurse -Force",
-            "Remove-Item ",
-            "ri ",
-            "dd "
+            "\\brm\\b -rf",
+            "\\brm\\b -fr",
+            "\\brm\\b\\s",
+            "\\brmdir\\b\\s",
+            "\\bdel\\b\\s",
+            "\\berase\\b\\s",
+            "\\brd\\b /s /q",
+            "\\brd\\b\\s",
+            "\\bRemove-Item\\b -Recurse -Force",
+            "\\bRemove-Item\\b\\s",
+            "\\bri\\b\\s",
+            "\\bdd\\b"
           ]
         }
       },

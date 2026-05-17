@@ -112,7 +112,7 @@ def main() -> None:
             cwd=event.cwd,
         )
 
-        result = evaluate(config, context)
+        result = evaluate(config, context, debug=DEBUG)
         DEBUG.log(
             "evaluate",
             tool=event.tool_name,
