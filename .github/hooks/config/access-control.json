@@ -99,7 +99,7 @@
         "when": {
           "command_patterns": [
             "format ",
-            "diskpart"
+            "\\bdiskpart\\b"
           ]
         }
       },
@@ -109,10 +109,10 @@
         "action": "deny",
         "when": {
           "command_patterns": [
-            "git push ",
-            "git push --force",
-            "git push -f ",
-            "git clone"
+            "\\bgit\\b\\s+push\\b\\s",
+            "\\bgit\\b\\s+push\\b\\s+--force(?:\\s|$)",
+            "\\bgit\\b\\s+push\\b\\s+-f(?:\\s|$)",
+            "\\bgit\\b\\s+clone\\b"
           ]
         }
       },
@@ -122,7 +122,7 @@
         "action": "deny",
         "when": {
           "command_patterns": [
-            "git reset --hard"
+            "\\bgit\\b\\s+reset\\b\\s+--hard(?:\\s|$)"
           ]
         }
       },
@@ -132,14 +132,13 @@
         "action": "deny",
         "when": {
           "command_patterns": [
-            "git log --output",
-            "--output=",
-            "git branch -d",
-            "git branch -D",
-            "git branch -m",
-            "git branch -M",
-            "git branch --delete",
-            "git branch --force"
+            "\\bgit\\b\\s+log\\b[^\\n]*--output(?:=|\\s)",
+            "\\bgit\\b\\s+branch\\b\\s+-d(?:\\s|$)",
+            "\\bgit\\b\\s+branch\\b\\s+-D(?:\\s|$)",
+            "\\bgit\\b\\s+branch\\b\\s+-m(?:\\s|$)",
+            "\\bgit\\b\\s+branch\\b\\s+-M(?:\\s|$)",
+            "\\bgit\\b\\s+branch\\b\\s+--delete(?:\\s|$)",
+            "\\bgit\\b\\s+branch\\b\\s+--force(?:\\s|$)"
           ]
         }
       },
@@ -149,13 +148,13 @@
         "action": "deny",
         "when": {
           "command_patterns": [
-            "kill ",
-            "Stop-Process",
-            "spps",
-            "taskkill",
-            "taskkill.exe",
-            "ps ",
-            "top "
+            "\\bkill\\b\\s",
+            "\\bStop-Process\\b",
+            "\\bspps\\b",
+            "\\btaskkill\\b",
+            "\\btaskkill\\.exe\\b",
+            "\\bps\\b\\s",
+            "\\btop\\b\\s"
           ]
         }
       },
@@ -165,12 +164,12 @@
         "action": "deny",
         "when": {
           "command_patterns": [
-            "curl ",
-            "wget ",
-            "Invoke-RestMethod",
-            "Invoke-WebRequest",
-            "irm ",
-            "iwr "
+            "\\bcurl\\b\\s",
+            "\\bwget\\b\\s",
+            "\\bInvoke-RestMethod\\b",
+            "\\bInvoke-WebRequest\\b",
+            "\\birm\\b\\s",
+            "\\biwr\\b\\s"
           ]
         }
       },
@@ -180,11 +179,11 @@
         "action": "deny",
         "when": {
           "command_patterns": [
-            "chmod ",
-            "chown ",
-            "Set-ItemProperty",
-            "Set-Acl",
-            "sp "
+            "\\bchmod\\b\\s",
+            "\\bchown\\b\\s",
+            "\\bSet-ItemProperty\\b",
+            "\\bSet-Acl\\b",
+            "\\bsp\\b\\s"
           ]
         }
       },
@@ -194,11 +193,11 @@
         "action": "deny",
         "when": {
           "command_patterns": [
-            "eval ",
-            "Invoke-Expression",
-            "iex ",
-            "xargs",
-            "jq "
+            "\\beval\\b\\s",
+            "\\bInvoke-Expression\\b",
+            "\\biex\\b\\s",
+            "\\bxargs\\b",
+            "\\bjq\\b\\s"
           ]
         }
       },
@@ -208,29 +207,29 @@
         "action": "deny",
         "when": {
           "command_patterns": [
-            "pip install",
-            "pip3 install",
-            "conda install",
-            "poetry add",
-            "pipenv install",
-            "pipx install",
-            "Install-Module",
-            "Install-Package",
-            "winget install",
-            "choco install",
-            "scoop install",
-            "apt install",
-            "apt-get install",
-            "yum install",
-            "dnf install",
-            "pacman -S",
-            "zypper install",
-            "apk add",
-            "brew install",
-            "snap install",
-            "npm install",
-            "yarn add",
-            "pnpm add"
+            "\\bpip\\b\\s+install\\b",
+            "\\bpip3\\b\\s+install\\b",
+            "\\bconda\\b\\s+install\\b",
+            "\\bpoetry\\b\\s+add\\b",
+            "\\bpipenv\\b\\s+install\\b",
+            "\\bpipx\\b\\s+install\\b",
+            "\\bInstall-Module\\b",
+            "\\bInstall-Package\\b",
+            "\\bwinget\\b\\s+install\\b",
+            "\\bchoco\\b\\s+install\\b",
+            "\\bscoop\\b\\s+install\\b",
+            "\\bapt\\b\\s+install\\b",
+            "\\bapt-get\\b\\s+install\\b",
+            "\\byum\\b\\s+install\\b",
+            "\\bdnf\\b\\s+install\\b",
+            "\\bpacman\\b\\s+-S(?:\\s|$)",
+            "\\bzypper\\b\\s+install\\b",
+            "\\bapk\\b\\s+add\\b",
+            "\\bbrew\\b\\s+install\\b",
+            "\\bsnap\\b\\s+install\\b",
+            "\\bnpm\\b\\s+install\\b",
+            "\\byarn\\b\\s+add\\b",
+            "\\bpnpm\\b\\s+add\\b"
           ]
         }
       },
@@ -240,10 +239,10 @@
         "action": "deny",
         "when": {
           "command_patterns": [
-            "column -c ",
-            "date -s",
-            "date --set",
-            "find -delete",
+            "\\bcolumn\\b\\s+-c(?:\\s|$)",
+            "\\bdate\\b\\s+-s(?:\\s|$)",
+            "\\bdate\\b\\s+--set(?:\\s|$)",
+            "\\bfind\\b\\s+-delete(?:\\s|$)",
             " -delete",
             " -exec",
             " -execdir",
@@ -252,17 +251,17 @@
             " -fls",
             " -ok ",
             " -okdir",
-            "rg --pre",
-            "rg --hostname-bin",
-            "sed -e",
-            "sed -f",
-            "sed --expression",
-            "sed --file",
-            "sed s/",
+            "\\brg\\b\\s+--pre(?:\\s|$)",
+            "\\brg\\b\\s+--hostname-bin(?:\\s|$)",
+            "\\bsed\\b\\s+-e(?:\\s|$)",
+            "\\bsed\\b\\s+-f(?:\\s|$)",
+            "\\bsed\\b\\s+--expression(?:\\s|$)",
+            "\\bsed\\b\\s+--file(?:\\s|$)",
+            "\\bsed\\b\\s+s/",
             ";W",
-            "sort -o",
-            "sort -S",
-            "tree -o"
+            "\\bsort\\b\\s+-o(?:\\s|$)",
+            "\\bsort\\b\\s+-S(?:\\s|$)",
+            "\\btree\\b\\s+-o(?:\\s|$)"
           ]
         }
       }
