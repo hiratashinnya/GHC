@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from debug_logging import HookDebugLogger
-from hook_payload import read_payload, parse_payload, PostToolUsePayload
+from hook_payload import get_hook_input, CommonPayload, PostToolUsePayload
 from tool_input import is_write_tool, get_written_paths
 from workspace_utils import to_workspace_relative
 
@@ -70,28 +70,26 @@ def _run_patch(cmd: List[str], workspace: str, cmd_preview: str, out: PostToolUs
 # main() phase helpers
 # ---------------------------------------------------------------------------
 
-def _parse_input() -> tuple[PostToolUsePayload, str, Path, Path]:
+def _parse_input() -> tuple[CommonPayload, str, Path, Path]:
     """Parse stdin payload and resolve workspace context.
 
     Returns (event, workspace, workspace_path, patch_script).
     Emits DEBUG.log("input") before returning.
     """
-    raw = read_payload()
-    event = parse_payload(raw)
-    if not isinstance(event, PostToolUsePayload):
-        event = PostToolUsePayload.from_dict(raw)
+    event = get_hook_input()    
     workspace = event.cwd or os.getcwd()
     workspace_path = Path(workspace)
     patch_script = workspace_path / ".github" / "scripts" / "patch_dashboard.py"
-    DEBUG.log("input", tool_name=event.tool_name, cwd=workspace)
+    tool_name = event.tool_name if isinstance(event, PostToolUsePayload) else "Skipped"
+    DEBUG.log("input", event_name=event.hook_event_name, tool_name=tool_name, cwd=workspace)
     return event, workspace, workspace_path, patch_script
 
 
 
 def _should_skip(
-    event: PostToolUsePayload,
+    event: CommonPayload,
     workspace_path: Path,
-) -> tuple[Optional[str], Optional[str]]:
+) -> tuple[Optional[str], Optional[str], Optional[PostToolUsePayload]]:
     """Determine whether this event should be skipped.
 
     Returns (reason, changed_file).
@@ -99,19 +97,21 @@ def _should_skip(
     caller should skip (e.g. "non-write tool", "not a docs/ .md file").
     changed_file is the written path extracted from tool_input, or None.
     """
+    if not isinstance(event, PostToolUsePayload):
+        return "not a PostToolUse event", None, None
     if not is_write_tool(event.tool_name):
-        return "non-write tool", None
+        return "non-write tool", None, None
     DEBUG.log("tool_input_keys", tool_name=event.tool_name, keys=list(event.tool_input.keys()))
     paths = get_written_paths(event.tool_name, event.tool_input)
     raw_file = paths[0] if paths else None
     if raw_file:
         rel = to_workspace_relative(raw_file, workspace_path)
         if rel is None or not rel.startswith("docs/") or not rel.lower().endswith(".md"):
-            return "not a docs/ .md file", raw_file
+            return "not a docs/ .md file", raw_file, event
         changed_file = rel
     else:
         changed_file = None
-    return None, changed_file
+    return None, changed_file, event
 
 
 def _run_dashboard_update(
@@ -142,22 +142,22 @@ def main() -> None:
     # 1. 入力パース
     event, workspace, workspace_path, patch_script = _parse_input()
     # 2. Skip判定（対象外は即時終了、I/O不要）
-    reason, changed_file = _should_skip(event, workspace_path)
-    if reason:
+    reason, changed_file, checked_event = _should_skip(event, workspace_path)
+    if reason or not checked_event:
         DEBUG.log("skip", reason=reason)
         return
     # 3. 前提条件のチェック（書き込みツールの場合のみ到達）
     if not patch_script.is_file():
-        sys.exit(event.warn(f"Dashboard sync hook could not find patch script. cwd={workspace}"))
+        sys.exit(checked_event.warn(f"Dashboard sync hook could not find patch script. cwd={workspace}"))
     # 4. ダッシュボード更新処理
     result, cmd_preview = _run_dashboard_update(
-        patch_script, changed_file, workspace, event
+        patch_script, changed_file, workspace, checked_event
     )
     # 5. result処理
     if result.returncode == 0:
         return  # 何も出力しない（正常終了）
     else:
-        sys.exit(event.warn(
+        sys.exit(checked_event.warn(
             "Dashboard sync hook reported an error. "
             f"Check post_tool_dashboard_sync.debug.log. cwd={workspace}; cmd={cmd_preview}"
         ))

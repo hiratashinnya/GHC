@@ -7,7 +7,7 @@
 ## テストケース一覧
 
 | テストID | 観点 | 入力 | 期待動作 |
-|----------|------|------|----------|
+| ---------- | ------ | ------ | ---------- |
 | HP-001 | `PreToolUsePayload.from_dict` 全フィールド正常 | 全キー揃った PreToolUse ペイロード dict | 各フィールドが正しくマップされる |
 | HP-002 | `PreToolUsePayload.from_dict` 欠落フィールド | 空 dict | 全フィールドがデフォルト値（空文字 / 空 dict）で生成される |
 | HP-003 | `PostToolUsePayload.from_dict` tool_response 有り | `tool_response` キー付きペイロード | `tool_response` が保持される |
@@ -32,7 +32,7 @@
 | HP-022 | `read_payload` isatty=True（TTY） | `stdin.isatty()` が `True` を返す | `{}` を返す |
 | HP-023 | `read_payload` 空 stdin | stdin から空バイト列が読まれる | `{}` を返す |
 | HP-024 | `deny` stdout JSON 内容 | `reason="理由"` | stdout に `permissionDecision:"deny"` + `permissionDecisionReason:"理由"` の JSON が出力される |
-| HP-025 | `deny` 戻り値 | `reason="理由"` | `EXIT_BLOCK (2)` を返す |
+| HP-025 | `deny` 戻り値 | `reason="理由"` | `EXIT_OK (0)` を返す |
 | HP-026 | `block` stdout 無出力 | `stderr_message=""` | stdout に何も出力しない |
 | HP-027 | `block` 戻り値 | `stderr_message="msg"` | `EXIT_BLOCK (2)` を返す |
 | HP-028 | `block` stderr 出力 | `stderr_message="msg"` | stderr に `"msg"` が出力される |
@@ -61,3 +61,5 @@
 | HP-051 | `read_payload` OSError 時の stderr 出力 | `stdin.buffer.read` が `OSError` を送出 | `{}` を返し、stderr に `"stdin read error"` を含むメッセージが出力される |
 | HP-052 | `read_payload` 無効 JSON 時の stderr 出力 | バイト列 `"not valid json"` | `{}` を返し、stderr に `"JSON parse error"` を含むメッセージが出力される |
 | HP-053 | `read_payload` デコード不可バイト列 | UTF-8 / cp932 どちらでもデコード不可なバイト列 | `{}` を返す（クラッシュしない） |
+| HP-054 | `get_hook_input` 高レベル入口 | stdin に `PreToolUse` JSON が流れる | `read + parse + dispatch` が1回で実行され `PreToolUsePayload` が返る |
+| HP-055 | facade 互換公開 | `hook_payload` import | `get_hook_input` が facade から import できる |

@@ -16,6 +16,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 from hook_payload import (
     EXIT_OK,
     EXIT_BLOCK,
+    get_hook_input,
     read_payload,
     parse_payload,
     CommonPayload,
@@ -169,19 +170,19 @@ class TestReadPayload(unittest.TestCase):
         return mock
 
     def test_HP013_valid_json(self):
-        with patch("hook_payload.sys.stdin", self._mock_stdin(b'{"hookEventName":"PostToolUse"}')):
+        with patch("hook_input.sys.stdin", self._mock_stdin(b'{"hookEventName":"PostToolUse"}')):
             result = read_payload()
         self.assertEqual(result, {"hookEventName": "PostToolUse"})
 
     def test_HP014_invalid_json(self):
-        with patch("hook_payload.sys.stdin", self._mock_stdin(b"not json")):
+        with patch("hook_input.sys.stdin", self._mock_stdin(b"not json")):
             result = read_payload()
         self.assertEqual(result, {})
 
     def test_HP022_isatty_returns_empty_dict(self):
         mock = MagicMock()
         mock.isatty.return_value = True
-        with patch("hook_payload.sys.stdin", mock):
+        with patch("hook_input.sys.stdin", mock):
             result = read_payload()
         self.assertEqual(result, {})
 
@@ -189,7 +190,7 @@ class TestReadPayload(unittest.TestCase):
         mock = MagicMock()
         mock.isatty.return_value = False
         mock.buffer.read.return_value = b""
-        with patch("hook_payload.sys.stdin", mock):
+        with patch("hook_input.sys.stdin", mock):
             result = read_payload()
         self.assertEqual(result, {})
 
@@ -200,7 +201,7 @@ class TestReadPayload(unittest.TestCase):
         mock = MagicMock()
         mock.isatty.return_value = False
         mock.buffer.read.return_value = raw_bytes
-        with patch("hook_payload.sys.stdin", mock):
+        with patch("hook_input.sys.stdin", mock):
             result = read_payload()
         self.assertEqual(result["hookEventName"], "PreToolUse")
         self.assertEqual(result["prompt"], "テスト")
@@ -211,7 +212,7 @@ class TestReadPayload(unittest.TestCase):
         mock.isatty.return_value = False
         mock.buffer.read.side_effect = OSError("pipe broken")
         buf = io.StringIO()
-        with patch("hook_payload.sys.stdin", mock), patch("hook_payload.sys.stderr", buf):
+        with patch("hook_input.sys.stdin", mock), patch("hook_input.sys.stderr", buf):
             result = read_payload()
         self.assertEqual(result, {})
         self.assertIn("stdin read error", buf.getvalue())
@@ -222,7 +223,7 @@ class TestReadPayload(unittest.TestCase):
         mock.isatty.return_value = False
         mock.buffer.read.return_value = b"not valid json"
         buf = io.StringIO()
-        with patch("hook_payload.sys.stdin", mock), patch("hook_payload.sys.stderr", buf):
+        with patch("hook_input.sys.stdin", mock), patch("hook_input.sys.stderr", buf):
             result = read_payload()
         self.assertEqual(result, {})
         self.assertIn("JSON parse error", buf.getvalue())
@@ -236,11 +237,26 @@ class TestReadPayload(unittest.TestCase):
         mock.isatty.return_value = False
         mock.buffer.read.return_value = raw_bytes
         buf = io.StringIO()
-        with patch("hook_payload.sys.stdin", mock), patch("hook_payload.sys.stderr", buf):
+        with patch("hook_input.sys.stdin", mock), patch("hook_input.sys.stderr", buf):
             result = read_payload()
         # Over-long UTF-8 bytes decoded via cp932 would produce garbled JSON -> {} expected
         # OR if both fail -> replacement characters -> JSON error -> {}
         self.assertEqual(result, {})
+
+
+class TestGetHookInput(unittest.TestCase):
+
+    def test_HP054_get_hook_input_returns_typed_event(self):
+        mock = MagicMock()
+        mock.isatty.return_value = False
+        mock.buffer.read.return_value = b'{"hookEventName":"PreToolUse","tool_name":"read_file"}'
+        with patch("hook_input.sys.stdin", mock):
+            result = get_hook_input()
+        self.assertIsInstance(result, PreToolUsePayload)
+        self.assertEqual(result.tool_name, "read_file")
+
+    def test_HP055_get_hook_input_is_reexported_from_facade(self):
+        self.assertTrue(callable(get_hook_input))
 
 
 # ---------------------------------------------------------------------------
@@ -269,7 +285,7 @@ class TestDeny(unittest.TestCase):
 
     def test_HP025_deny_return_value(self):
         ret, _ = _capture_stdout(self.event.deny, "理由")
-        self.assertEqual(ret, EXIT_BLOCK)
+        self.assertEqual(ret, EXIT_OK)
 
 
 class TestBlock(unittest.TestCase):

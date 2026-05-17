@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 from debug_logging import HookDebugLogger
-from hook_payload import read_payload, parse_payload, PreToolUsePayload
+from hook_payload import get_hook_input, PreToolUsePayload
 from ac_config_loader import load_config
 from ac_rule_engine import MatchContext, RuleMatch, evaluate
 
@@ -92,8 +92,7 @@ def _dispatch_action(
 
 def main() -> None:
     try:
-        raw = read_payload()
-        event = parse_payload(raw)
+        event = get_hook_input(debug=DEBUG)
         DEBUG.log(
             "input",
             hook_event=event.hook_event_name,

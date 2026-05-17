@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from debug_logging import HookDebugLogger
-from hook_payload import read_payload, parse_payload, PreToolUsePayload
+from hook_payload import get_hook_input, CommonPayload, PreToolUsePayload
 from tool_input import is_write_tool, get_written_paths
 from workspace_utils import dedup_paths
 from _lib._config import PHASES, PHASE_TO_INDEX, PROCESS_NAMES
@@ -378,16 +378,14 @@ def resolve_target_path(cli_target: Optional[str]) -> Optional[str]:
 # main() phase helpers
 # ---------------------------------------------------------------------------
 
-def _parse_input() -> tuple[PreToolUsePayload, argparse.Namespace]:
+def _parse_input() -> tuple[CommonPayload, argparse.Namespace]:
     """Parse CLI arguments and stdin payload."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--target-path", default=None)
     args = ap.parse_args()
-    raw = read_payload()
-    event = parse_payload(raw)
-    if not isinstance(event, PreToolUsePayload):
-        event = PreToolUsePayload.from_dict(raw)
-    DEBUG.log("input", tool_name=event.tool_name)
+    event = get_hook_input()
+    DEBUG.log("input", event_name=event.hook_event_name, tool_name=event.tool_name if isinstance(event, PreToolUsePayload) else "Skipped")
+
     return event, args
 
 
@@ -442,6 +440,9 @@ def main() -> None:
         # 1. 入力パース
         event, args = _parse_input()
         # 2. Skip判定
+        if not isinstance(event, PreToolUsePayload):
+            DEBUG.log("skip", reason="not a PreToolUse event")
+            return
         # Only gate-check write tools; read operations are always allowed.
         if event.tool_name and not is_write_tool(event.tool_name):
             DEBUG.log("skip", reason="non-write tool")

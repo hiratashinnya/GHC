@@ -45,7 +45,8 @@
 ## Python テンプレート（最小版）
 
 テンプレートファイル: [.github/hooks/scripts/hook-template.py](../hooks/scripts/hook-template.py)
-ペイロード解析・出力制御ライブラリ: [.github/hooks/scripts/hook_payload.py](../hooks/scripts/hook_payload.py)
+ペイロード facade: [.github/hooks/scripts/hook_payload.py](../hooks/scripts/hook_payload.py)
+内部ライブラリ: [.github/hooks/scripts/hook_input.py](../hooks/scripts/hook_input.py) / [.github/hooks/scripts/hook_event.py](../hooks/scripts/hook_event.py) / [.github/hooks/scripts/hook_output.py](../hooks/scripts/hook_output.py)
 ツール入力ライブラリ: [.github/hooks/scripts/tool_input.py](../hooks/scripts/tool_input.py)
 
 新しいスクリプトを作成する際は `hook-template.py` をコピーして使用すること。

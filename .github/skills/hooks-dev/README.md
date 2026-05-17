@@ -16,7 +16,7 @@ VS Code 向け GitHub Copilot エージェントフックの開発・デバッ�
 
 ## ファイル構成
 
-```
+```text
 .github/skills/hooks-dev/
   SKILL.md      ← Copilot が参照する英語の知識ベース（本スキルの本体）
   README.md     ← このファイル（日本語概要）
@@ -39,7 +39,10 @@ VS Code 向け GitHub Copilot エージェントフックの開発・デバッ�
 | [`hooks-docs/payload-PreCompact.md`](../hooks-docs/payload-PreCompact.md) | 圧縮前の状態保存 |
 | [`hooks-docs/tool-input-schema.md`](../hooks-docs/tool-input-schema.md) | 全ツールの tool_input スキーマ・読み書き分類表 |
 | [`hooks-docs/hook-template.md`](../hooks-docs/hook-template.md) | チェックリスト・Python テンプレート・ブロックパターン集 |
-| [`hooks/scripts/hook_payload.py`](../hooks/scripts/hook_payload.py) | `read_payload()` / `parse_payload()` / 全 8 イベント分型データクラス |
+| [`hooks/scripts/hook_payload.py`](../hooks/scripts/hook_payload.py) | facade: `get_hook_input()` / `get_hook_input_as()` / 互換 re-export |
+| [`hooks/scripts/hook_input.py`](../hooks/scripts/hook_input.py) | `read_payload()` / `get_hook_input()` / `get_hook_input_as()` |
+| [`hooks/scripts/hook_event.py`](../hooks/scripts/hook_event.py) | 全 8 イベント分型データクラス / `parse_payload()` |
+| [`hooks/scripts/hook_output.py`](../hooks/scripts/hook_output.py) | 出力 alias 付与 / `emit_output()` / `EXIT_OK` / `EXIT_BLOCK` |
 | [`hooks/scripts/tool_input.py`](../hooks/scripts/tool_input.py) | `is_write_tool()` / `is_read_tool()` / `get_written_paths()` / `get_read_paths()` |
 
 ---
@@ -66,5 +69,5 @@ VS Code 向け GitHub Copilot エージェントフックの開発・デバッ�
 | `SubagentStop` で `hookSpecificOutput.decision` を使う | `SubagentStop` はトップレベルの `decision` を使う（`Stop` と異なる） |
 | `timestamp` を整数（Unix ms）として扱う | VS Code では ISO 8601 文字列 |
 | `permissionDecision: "ask"` が動かない | VS Code のみ対応（Cloud Agent/CLI では動作しない） |
-| スクリプト内で `payload.get("tool_name")` を直接利用 | `hook_payload.py` を import し `parse_payload()` で型付きオブジェクトを取得 |
+| スクリプト内で `payload.get("tool_name")` を直接利用 | `hook_payload.py` を import し `get_hook_input()` または `get_hook_input_as()` で型付きオブジェクトを取得 |
 | 読み取りアクセス制御に書き込みツール判定を流用 | `is_read_tool()` + `get_read_paths()` を使う（`tool_input.py`） |

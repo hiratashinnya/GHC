@@ -3,7 +3,7 @@
 from __future__ import annotations
 from pathlib import Path
 from debug_logging import HookDebugLogger
-from hook_payload import read_payload, parse_payload, PreToolUsePayload
+from hook_payload import get_hook_input, PreToolUsePayload
 from tool_input import is_write_tool, get_written_paths, is_read_tool, get_read_paths
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -12,8 +12,7 @@ DEBUG = HookDebugLogger(SCRIPT_DIR, "<script_name>")
 
 def main() -> None:
     try:
-        raw = read_payload()
-        event = parse_payload(raw)
+        event = get_hook_input()
 
         DEBUG.log("input", hook_event=event.hook_event_name)
 
