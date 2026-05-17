@@ -11,7 +11,7 @@ from debug_logging import HookDebugLogger
 _DECODE_CHAIN = ("utf-8", "cp932")
 
 
-def read_payload(debug: Optional[HookDebugLogger]) -> Dict[str, Any]:
+def read_payload(debug: Optional[HookDebugLogger] = None) -> Dict[str, Any]:
     """Read the hook payload from stdin and return it as a plain dict."""
     if sys.stdin.isatty():
         return {}
