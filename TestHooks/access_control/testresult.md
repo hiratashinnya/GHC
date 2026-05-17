@@ -2,10 +2,10 @@
 
 対象スクリプト: `.github/hooks/scripts/access_control.py`
 関連モジュール: `ac_config_loader.py`, `ac_rule_engine.py`
-実行日: 2026-05-11
-コミットID: 5ba330b
-実行コマンド: `python -m unittest test_access_control -v`
-総合結果: **PASS** (55/55)
+実行日: 2026-05-17
+コミットID: 80ec6ff
+実行コマンド: `python c:\GHC\TestHooks\access_control\test_access_control.py`
+総合結果: **PASS** (61/61)
 
 ---
 
@@ -68,6 +68,12 @@
 | AC-089 | TestDispatchAction | action='confirm' → sys.exit(ask) | event.ask() 呼び出し後 sys.exit(0) | PASS |
 | AC-090 | TestDispatchAction | action='allow' + warning='' → sys.exit なし | sys.exit なし | PASS |
 | AC-091 | TestDispatchAction | action='allow' + warning あり → sys.exit(warn) [リグレッション] | event.warn() 呼び出し後 sys.exit(0) | PASS |
+| AC-092 | TestCommandPatternRegex | `git add` が `\\bdd\\b` に誤マッチしない | `[]` を返す | PASS |
+| AC-093 | TestCommandPatternRegex | `dd if=/dev/zero` が `\\bdd\\b` にマッチ | `['\\bdd\\b']` を返す | PASS |
+| AC-093b | TestCommandPatternRegex | `deadline-...` が `\\bdd\\b` に非マッチ | `[]` を返す | PASS |
+| AC-094 | TestCommandPatternRegex | 無効 regex は skip し debug ログ記録 | 無効パターンは結果に含まれず、`debug.log()` 呼び出し | PASS |
+| AC-095 | TestCommandPatternRegex | 複数 regex のマッチ結果を返す | `\\brm\\b` が含まれる結果を返す | PASS |
+| AC-096 | TestCommandPatternRegex | regex マッチは大小文字無視 | `['\\bDD\\b']` を返す | PASS |
 
 ---
 
@@ -82,3 +88,5 @@
 | 5 | AC-036 | `find -delete` パターンが `find . -delete` にサブストリング不一致 | テストパターンを ` -delete` に修正（access-control.json と整合） |
 | 6 | AC-038/AC-039 | `git push` 全般・`git clone`・外部ライブラリインストールのブロック要件を追加 | `access-control.json` に `git push ` / `git clone` / `deny-package-install` を追加し、テストケースとユニットテストを拡張 |
 | 7 | AC-042 | PowerShell/Linux/Node 系インストールコマンドの未カバーを追加対応 | `deny-package-install` に `Install-Module` / `Install-Package` / `winget` / `apt` / `yum` / `dnf` / `pacman` / `zypper` / `apk` / `brew` / `snap` / `npm install` / `yarn add` / `pnpm add` を追加しテストを拡張 |
+| 8 | AC-092〜AC-096 | コマンドパターンの部分一致で `git add` が `dd` と誤判定されるリスク | `ac_rule_engine.py` を regex マッチング化し、`\b` 境界付きパターン運用に変更。無効 regex は debug ログ出力して skip |
+| 9 | AC-092〜AC-096 | 設定側 regex の妥当性未検証 | `ac_config_loader.py` で `command_patterns` を `re.compile` 検証し、無効パターンを `skipped_rules` に収集 |
