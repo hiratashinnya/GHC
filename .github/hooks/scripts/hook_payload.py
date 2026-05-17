@@ -22,15 +22,51 @@ from __future__ import annotations
 import json
 import sys
 from dataclasses import dataclass, field
-from typing import Any, Dict, Type
+from typing import Any, Dict, Type, cast
 
 EXIT_OK: int = 0
 EXIT_BLOCK: int = 2
 
 
+def _get_first(data: Dict, *keys: str, default: object = "") -> object:
+    """Return the first present payload value among multiple key spellings."""
+    for key in keys:
+        if key in data:
+            return data[key]
+    return default
+
+
+def _with_output_aliases(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Add snake_case aliases for hook output keys used by the runtime."""
+    result = dict(data)
+
+    if "systemMessage" in result and "system_message" not in result:
+        result["system_message"] = result["systemMessage"]
+    if "stopReason" in result and "stop_reason" not in result:
+        result["stop_reason"] = result["stopReason"]
+
+    hook_output = result.get("hookSpecificOutput")
+    if isinstance(hook_output, dict):
+        hook_specific_output = dict(hook_output)
+        alias_pairs = {
+            "hookEventName": "hook_event_name",
+            "permissionDecision": "permission_decision",
+            "permissionDecisionReason": "permission_decision_reason",
+            "updatedInput": "updated_input",
+            "additionalContext": "additional_context",
+        }
+        for camel_key, snake_key in alias_pairs.items():
+            if camel_key in hook_specific_output and snake_key not in hook_specific_output:
+                hook_specific_output[snake_key] = hook_specific_output[camel_key]
+        result["hookSpecificOutput"] = hook_specific_output
+        result.setdefault("hook_specific_output", hook_specific_output)
+
+    return result
+
+
 def _emit(data: Dict) -> None:
     """Write compact JSON to stdout (1 line, UTF-8)."""
-    print(json.dumps(data, ensure_ascii=False))
+    print(json.dumps(_with_output_aliases(data), ensure_ascii=False))
 
 
 # ---------------------------------------------------------------------------
@@ -108,11 +144,11 @@ class CommonPayload:
     def _common(cls, d: Dict) -> Dict:
         """Extract common fields from a raw payload dict."""
         return {
-            "timestamp": d.get("timestamp", ""),
-            "cwd": d.get("cwd", ""),
-            "session_id": d.get("sessionId", ""),
-            "hook_event_name": d.get("hookEventName", ""),
-            "transcript_path": d.get("transcript_path", ""),
+            "timestamp": _get_first(d, "timestamp", default=""),
+            "cwd": _get_first(d, "cwd", default=""),
+            "session_id": _get_first(d, "sessionId", "session_id", default=""),
+            "hook_event_name": _get_first(d, "hookEventName", "hook_event_name", default=""),
+            "transcript_path": _get_first(d, "transcript_path", "transcriptPath", default=""),
         }
 
     @classmethod
@@ -202,7 +238,7 @@ class PreToolUsePayload(CommonPayload):
         """PreToolUse: block via permissionDecision deny.
 
         Preferred over block() when a user-visible reason is needed.
-        Emits hookSpecificOutput with permissionDecision:"deny". Returns EXIT_BLOCK (2).
+        Emits hookSpecificOutput with permissionDecision:"deny". Returns EXIT_OK (0).
         """
         _emit({
             "hookSpecificOutput": {
@@ -211,7 +247,7 @@ class PreToolUsePayload(CommonPayload):
                 "permissionDecisionReason": reason,
             }
         })
-        return EXIT_BLOCK
+        return EXIT_OK
 
     def ask(self, reason: str) -> int:
         """PreToolUse: request user confirmation dialog (VS Code only).
@@ -403,6 +439,6 @@ def parse_payload(d: Dict) -> CommonPayload:
 
     Falls back to CommonPayload for unknown or missing hookEventName values.
     """
-    event_name = d.get("hookEventName", "")
+    event_name = cast(str, _get_first(d, "hookEventName", "hook_event_name", default=""))
     cls = _DISPATCH.get(event_name, CommonPayload)
     return cls.from_dict(d)

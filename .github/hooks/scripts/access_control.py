@@ -94,7 +94,12 @@ def main() -> None:
     try:
         raw = read_payload()
         event = parse_payload(raw)
-        DEBUG.log("input", hook_event=event.hook_event_name)
+        DEBUG.log(
+            "input",
+            hook_event=event.hook_event_name,
+            tool_name=getattr(event, "tool_name", ""),
+            keys=list(getattr(event, "tool_input", {}).keys()),
+        )
 
         if not isinstance(event, PreToolUsePayload):
             return
