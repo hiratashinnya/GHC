@@ -1,10 +1,10 @@
 # testresult: hook_payload.py
 
 対象スクリプト: `.github/hooks/scripts/hook_payload.py`
-実行日: 2026-05-11
-コミットID: a41de1e
+実行日: 2026年5月17日
+コミットID: 07e63e2
 実行コマンド: `python -m unittest test_hook_payload -v`
-総合結果: **PASS** (53/53)
+総合結果: **PASS** (55/55)
 
 ---
 
@@ -36,7 +36,7 @@
 | HP-022 | `read_payload` isatty=True（TTY） | `stdin.isatty()` が `True` を返す | `{}` を返す | `{}` | PASS |
 | HP-023 | `read_payload` 空 stdin | stdin から空バイト列が読まれる | `{}` を返す | `{}` | PASS |
 | HP-024 | `deny` stdout JSON 内容 | `reason="理由"` | stdout に `permissionDecision:"deny"` + `permissionDecisionReason:"理由"` の JSON が出力される | 期待 JSON 一致 | PASS |
-| HP-025 | `deny` 戻り値 | `reason="理由"` | `EXIT_BLOCK (2)` を返す | `2` | PASS |
+| HP-025 | `deny` 戻り値 | `reason="理由"` | `EXIT_OK (0)` を返す | `0` | PASS |
 | HP-026 | `block` stdout 無出力 | `stderr_message=""` | stdout に何も出力しない | stdout 空 | PASS |
 | HP-027 | `block` 戻り値 | `stderr_message="msg"` | `EXIT_BLOCK (2)` を返す | `2` | PASS |
 | HP-028 | `block` stderr 出力 | `stderr_message="msg"` | stderr に `"msg"` が出力される | `"msg"` | PASS |
@@ -65,3 +65,5 @@
 | HP-051 | `read_payload` OSError 時の stderr 出力 | `stdin.buffer.read` が `OSError` を送出 | `{}` を返し、stderr に `"stdin read error"` を含むメッセージが出力される | 期待通り | PASS |
 | HP-052 | `read_payload` 無効 JSON 時の stderr 出力 | バイト列 `"not valid json"` | `{}` を返し、stderr に `"JSON parse error"` を含むメッセージが出力される | 期待通り | PASS |
 | HP-053 | `read_payload` デコード不可バイト列 | UTF-8 / cp932 どちらでもデコード不可なバイト列 | `{}` を返す（クラッシュしない） | `{}` | PASS |
+| HP-054 | `get_hook_input` 高レベル入口 | stdin に `PreToolUse` JSON が流れる | `read + parse + dispatch` が1回で実行され `PreToolUsePayload` が返る | `PreToolUsePayload` | PASS |
+| HP-055 | facade 互換公開 | `hook_payload` import | `get_hook_input` が facade から import できる | callable であることを確認 | PASS |
