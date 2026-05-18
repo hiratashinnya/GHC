@@ -930,9 +930,9 @@ class TestGetReadPaths(unittest.TestCase):
         self.assertEqual(result, ["a.py", "b.py"])
 
     def test_AC112_grep_search_include_pattern(self):
-        """AC-112: grep_search returns includePattern"""
+        """AC-112: grep_search includePattern is scope metadata, not read path"""
         result = get_read_paths("grep_search", {"includePattern": "src/**/*.py"})
-        self.assertEqual(result, ["src/**/*.py"])
+        self.assertEqual(result, [])
 
     def test_AC113_non_read_tool_returns_empty(self):
         """AC-113: non-read tool (apply_patch) returns []"""

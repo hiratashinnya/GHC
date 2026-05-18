@@ -153,7 +153,7 @@
 |----------|------|-----------|------------|----------|
 | AC-110 | read_file: filePath を返す | `read_file` | `{"filePath": "docs/foo.md"}` | `["docs/foo.md"]` を返す |
 | AC-111 | get_errors: filePaths リストを返す | `get_errors` | `{"filePaths": ["a.py", "b.py"]}` | `["a.py", "b.py"]` を返す |
-| AC-112 | grep_search: includePattern を返す | `grep_search` | `{"includePattern": "src/**/*.py"}` | `["src/**/*.py"]` を返す |
+| AC-112 | grep_search: includePattern は read path として扱わない | `grep_search` | `{"includePattern": "src/**/*.py"}` | `[]` を返す |
 | AC-113 | 非 read ツールは空を返す | `apply_patch` | `{"input": "*** Update File: foo.py"}` | `[]` を返す |
 
 ### tool_input_parser.py — get_command_string()
@@ -172,5 +172,5 @@
 | AC-130 | apply_patch のパスが deny ルールにマッチ | `apply_patch` | `{"input": "*** Update File: .github/hooks/scripts/foo.py"}` | deny ルール `.github/hooks/scripts/**` | deny を返す |
 | AC-131 | create_and_run_task のコマンドが deny ルールにマッチ | `create_and_run_task` | `{"task": {"command": "rm", "args": ["-rf", "./dist"]}}` | deny ルール `\\brm\\b` | deny を返す |
 | AC-132 | send_to_terminal が command ツールとして評価される | `send_to_terminal` | `{"command": "git push origin main"}` | deny ルール `\\bgit\\b\\s+push\\b` | deny を返す |
-| AC-133 | grep_search が read ツールとして評価される | `grep_search` | `{"includePattern": ".env"}` | deny ルール `**/.env` | `None` を返す（includePattern はパスでない） |
+| AC-133 | grep_search が read ツールとして評価される | `grep_search` | `{"includePattern": ".env"}` | deny ルール `**/.env` | `None` を返す（includePattern は探索スコープ指定であり実パスではない） |
 | AC-134 | workspace 外絶対パスが評価対象から漏れないこと | `create_file` | `{"filePath": "D:/other/secret.py"}` | deny ルール `D:/other/**` | deny を返す（_to_posix_relative で相対化されず、forward-slash 変換後にマッチ） |
