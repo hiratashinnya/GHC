@@ -98,3 +98,11 @@ Check for:
 3. Commit all changed files.
 4. Run: `python -m unittest discover -s TestHooks/access_control -p "test_access_control.py" -v`
 5. Record result in `testresult.md` with `実行日:` and `コミットID:` (from `git log --oneline -1`).
+
+### Failure Recording Policy (mandatory)
+
+- Do not conceal failed tests. Record actual outcome as-is in `testresult.md`.
+- If any test fails, add both sections below:
+  1. 備考付きサマリ (note rows for each failed test ID)
+  2. 失敗詳細 (期待値 / 実際値 / 原因 / 次アクション)
+- Never change testcase/test assertion only to make the current result look green without explicit policy decision.

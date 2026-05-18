@@ -2,10 +2,10 @@
 
 対象スクリプト: `.github/hooks/scripts/access_control.py`
 関連モジュール: `ac_config_loader.py`, `ac_rule_engine.py`
-実行日: 2026-05-17
-コミットID: 80ec6ff
+実行日: 2026-05-18
+コミットID: 8ec1052
 実行コマンド: `python c:\GHC\TestHooks\access_control\test_access_control.py`
-総合結果: **PASS** (61/61)
+総合結果: **FAIL** (79/80)
 
 ---
 
@@ -74,6 +74,42 @@
 | AC-094 | TestCommandPatternRegex | 無効 regex は skip し debug ログ記録 | 無効パターンは結果に含まれず、`debug.log()` 呼び出し | PASS |
 | AC-095 | TestCommandPatternRegex | 複数 regex のマッチ結果を返す | `\\brm\\b` が含まれる結果を返す | PASS |
 | AC-096 | TestCommandPatternRegex | regex マッチは大小文字無視 | `['\\bDD\\b']` を返す | PASS |
+| AC-100 | TestGetWritePaths | apply_patch: Update File パスを抽出 | `["c:\\GHC\\docs\\foo.md"]` を返す | PASS |
+| AC-101 | TestGetWritePaths | apply_patch: 複数 File 行を抽出 | 両パスをリストで返す | PASS |
+| AC-102 | TestGetWritePaths | apply_patch: rename の source パスのみ返す | `["old.py"]` を返す | PASS |
+| AC-103 | TestGetWritePaths | apply_patch: input が非文字列 → 空リスト | `[]` を返す | PASS |
+| AC-104 | TestGetWritePaths | create_directory: dirPath を返す | `["src/subdir"]` を返す | PASS |
+| AC-105 | TestGetWritePaths | 非 write ツール → 空リスト | `[]` を返す | PASS |
+| AC-110 | TestGetReadPaths | read_file: filePath を返す | `["docs/foo.md"]` を返す | PASS |
+| AC-111 | TestGetReadPaths | get_errors: filePaths リストを返す | `["a.py", "b.py"]` を返す | PASS |
+| AC-112 | TestGetReadPaths | grep_search: includePattern を返す | `["src/**/*.py"]` を返す | PASS |
+| AC-113 | TestGetReadPaths | 非 read ツール → 空リスト | `[]` を返す | PASS |
+| AC-120 | TestGetCommandString | command キー直接参照 | `"git status"` を返す | PASS |
+| AC-121 | TestGetCommandString | task.command + task.args を合成 | `"python -m pytest"` を返す | PASS |
+| AC-122 | TestGetCommandString | task.args 空 → コマンドのみ | `"python"` を返す | PASS |
+| AC-123 | TestGetCommandString | キーなし → 空文字 | `""` を返す | PASS |
+| AC-130 | TestEvaluateViaParser | apply_patch パスが deny ルールにマッチ | deny を返す | PASS |
+| AC-131 | TestEvaluateViaParser | create_and_run_task コマンドが deny ルールにマッチ | deny を返す | PASS |
+| AC-132 | TestEvaluateViaParser | send_to_terminal が command ツールとして評価 | deny を返す | PASS |
+| AC-133 | TestEvaluateViaParser | grep_search includePattern は path ルールに非マッチ | `None` を返す | FAIL |
+| AC-134 | TestEvaluateViaParser | workspace 外絶対パスが評価対象から漏れない | deny を返す | PASS |
+
+### 備考付きサマリ
+
+| テストID | 判定 | 備考 |
+|----------|------|------|
+| AC-133 | FAIL | 実測では `includePattern=".env"` が `**/.env` にマッチし deny となったため、期待値 `None` と不一致。 |
+
+### 失敗詳細
+
+| 項目 | 内容 |
+|------|------|
+| テストID | AC-133 |
+| 実行時の現象 | `evaluate()` が `RuleMatch(... action='deny' ...)` を返却 |
+| テスト期待値 | `None` |
+| 実際値 | deny の `RuleMatch` |
+| 失敗理由 | `grep_search` の `includePattern` を read path として扱う現行ロジックで `**/.env` にマッチしたため |
+| 次アクション | 「`includePattern` を path と見なすか」の仕様方針を決定し、実装またはテスト期待値を統一する |
 
 ---
 
@@ -90,3 +126,4 @@
 | 7 | AC-042 | PowerShell/Linux/Node 系インストールコマンドの未カバーを追加対応 | `deny-package-install` に `Install-Module` / `Install-Package` / `winget` / `apt` / `yum` / `dnf` / `pacman` / `zypper` / `apk` / `brew` / `snap` / `npm install` / `yarn add` / `pnpm add` を追加しテストを拡張 |
 | 8 | AC-092〜AC-096 | コマンドパターンの部分一致で `git add` が `dd` と誤判定されるリスク | `ac_rule_engine.py` を regex マッチング化し、`\b` 境界付きパターン運用に変更。無効 regex は debug ログ出力して skip |
 | 9 | AC-092〜AC-096 | 設定側 regex の妥当性未検証 | `ac_config_loader.py` で `command_patterns` を `re.compile` 検証し、無効パターンを `skipped_rules` に収集 |
+| 10 | — | tool_input 解析ロジックが ac_rule_engine に混在していた | `tool_input_parser.py` に parser を分離し、`hook_event.py` をファサード化、`ac_rule_engine.py` を委譲形式に変更 |
