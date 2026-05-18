@@ -42,25 +42,39 @@ from typing import Dict, List, Optional
 from ac_config_loader import AccessControlConfig, Rule
 import re
 from debug_logging import HookDebugLogger
+from tool_input_parser import get_write_paths, get_read_paths, get_command_string
 
 # ---------------------------------------------------------------------------
 # Tool classification
 # ---------------------------------------------------------------------------
 
 WRITE_TOOLS: frozenset = frozenset({
+    "apply_patch",
     "replace_string_in_file",
     "create_file",
     "multi_replace_string_in_file",
+    "create_directory",
+    "edit_notebook_file",
+    "create_new_jupyter_notebook",
+    "create_new_workspace",
 })
 
 READ_TOOLS: frozenset = frozenset({
     "read_file",
     "list_dir",
     "view_image",
+    "file_search",
+    "grep_search",
+    "get_errors",
+    "read_notebook_cell_output",
+    "copilot_getNotebookSummary",
+    "get_changed_files",
 })
 
 COMMAND_TOOLS: frozenset = frozenset({
     "run_in_terminal",
+    "send_to_terminal",
+    "create_and_run_task",
 })
 
 # deny > confirm（priority リストの先頭が最優先）
@@ -106,33 +120,15 @@ class RuleMatch:
 # ---------------------------------------------------------------------------
 
 def _get_paths_from_tool_input(tool_name: str, tool_input: Dict) -> List[str]:
-    """tool_input からファイルパスのリストを抽出する。"""
-    if tool_name == "multi_replace_string_in_file":
-        replacements = tool_input.get("replacements") or []
-        paths = [r.get("filePath", "") for r in replacements if r.get("filePath")]
-        if not paths:
-            fp = tool_input.get("filePath", "")
-            return [fp] if fp else []
-        return paths
-
-    if tool_name in ("replace_string_in_file", "create_file"):
-        fp = tool_input.get("filePath", "")
-        return [fp] if fp else []
-
-    if tool_name in ("read_file", "view_image"):
-        fp = tool_input.get("filePath", "")
-        return [fp] if fp else []
-
-    if tool_name == "list_dir":
-        directory = tool_input.get("path", "")
-        return [directory] if directory else []
-
-    return []
+    """tool_input からファイルパスのリストを抽出する（tool_input_parser に委譲）。"""
+    if tool_name in WRITE_TOOLS:
+        return get_write_paths(tool_name, tool_input)
+    return get_read_paths(tool_name, tool_input)
 
 
 def _get_command_from_tool_input(tool_input: Dict) -> str:
-    """tool_input からコマンド文字列を取得する。"""
-    return tool_input.get("command", "")
+    """tool_input からコマンド文字列を取得する（tool_input_parser に委譲）。"""
+    return get_command_string(tool_input)
 
 
 def _to_posix_relative(path_str: str, cwd: str) -> str:
@@ -140,6 +136,10 @@ def _to_posix_relative(path_str: str, cwd: str) -> str:
 
     絶対パスかつ cwd が判明している場合は cwd で相対化を試みる。
     相対化できない場合はそのまま forward-slash に変換して返す。
+
+    # Note: workspace_utils.to_workspace_relative への置換は不採用。
+    # 理由: workspace 外の絶対パス（例: D:/other/... 形式）を評価対象として残すために
+    # None を返す同関数へ置き換えてしまうと、ブロックルールが到達しなくなる。
     """
     if not path_str:
         return ""

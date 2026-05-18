@@ -36,6 +36,7 @@ from access_control import (
     _dispatch_action,
 )
 from hook_payload import PreToolUsePayload
+from tool_input_parser import get_write_paths, get_read_paths, get_command_string
 
 
 # ---------------------------------------------------------------------------
@@ -870,6 +871,211 @@ class TestCommandPatternRegex(unittest.TestCase):
         command = "dd if=/dev/zero"
         matched = _match_command_patterns(patterns, command, debug=None)
         self.assertEqual(matched, [r"\bDD\b"])
+
+
+# ---------------------------------------------------------------------------
+# tool_input_parser — get_write_paths
+# ---------------------------------------------------------------------------
+
+class TestGetWritePaths(unittest.TestCase):
+
+    def test_AC100_apply_patch_update_file(self):
+        """AC-100: apply_patch extracts path from '*** Update File:' line"""
+        tool_input = {"input": "*** Update File: c:\\GHC\\docs\\foo.md\n@@\n-old\n+new"}
+        result = get_write_paths("apply_patch", tool_input)
+        self.assertEqual(result, ["c:\\GHC\\docs\\foo.md"])
+
+    def test_AC101_apply_patch_multiple_files(self):
+        """AC-101: apply_patch extracts multiple paths"""
+        patch = "*** Update File: docs/foo.md\n@@\n*** Add File: src/bar.py\n@@"
+        result = get_write_paths("apply_patch", {"input": patch})
+        self.assertEqual(result, ["docs/foo.md", "src/bar.py"])
+
+    def test_AC102_apply_patch_rename_source_only(self):
+        """AC-102: apply_patch rename patch returns source path only"""
+        patch = "*** Update File: old.py -> new.py"
+        result = get_write_paths("apply_patch", {"input": patch})
+        self.assertEqual(result, ["old.py"])
+
+    def test_AC103_apply_patch_invalid_input_type(self):
+        """AC-103: apply_patch with non-string input returns []"""
+        result = get_write_paths("apply_patch", {"input": 42})
+        self.assertEqual(result, [])
+
+    def test_AC104_create_directory_dir_path(self):
+        """AC-104: create_directory returns dirPath"""
+        result = get_write_paths("create_directory", {"dirPath": "src/subdir"})
+        self.assertEqual(result, ["src/subdir"])
+
+    def test_AC105_non_write_tool_returns_empty(self):
+        """AC-105: non-write tool returns []"""
+        result = get_write_paths("read_file", {"filePath": "docs/foo.md"})
+        self.assertEqual(result, [])
+
+
+# ---------------------------------------------------------------------------
+# tool_input_parser — get_read_paths
+# ---------------------------------------------------------------------------
+
+class TestGetReadPaths(unittest.TestCase):
+
+    def test_AC110_read_file_filepath(self):
+        """AC-110: read_file returns filePath"""
+        result = get_read_paths("read_file", {"filePath": "docs/foo.md"})
+        self.assertEqual(result, ["docs/foo.md"])
+
+    def test_AC111_get_errors_file_paths(self):
+        """AC-111: get_errors returns filePaths list"""
+        result = get_read_paths("get_errors", {"filePaths": ["a.py", "b.py"]})
+        self.assertEqual(result, ["a.py", "b.py"])
+
+    def test_AC112_grep_search_include_pattern(self):
+        """AC-112: grep_search returns includePattern"""
+        result = get_read_paths("grep_search", {"includePattern": "src/**/*.py"})
+        self.assertEqual(result, ["src/**/*.py"])
+
+    def test_AC113_non_read_tool_returns_empty(self):
+        """AC-113: non-read tool (apply_patch) returns []"""
+        result = get_read_paths("apply_patch", {"input": "*** Update File: foo.py"})
+        self.assertEqual(result, [])
+
+
+# ---------------------------------------------------------------------------
+# tool_input_parser — get_command_string
+# ---------------------------------------------------------------------------
+
+class TestGetCommandString(unittest.TestCase):
+
+    def test_AC120_command_key_direct(self):
+        """AC-120: direct command key"""
+        result = get_command_string({"command": "git status"})
+        self.assertEqual(result, "git status")
+
+    def test_AC121_create_and_run_task_command_args(self):
+        """AC-121: task.command + task.args are concatenated"""
+        result = get_command_string({"task": {"command": "python", "args": ["-m", "pytest"]}})
+        self.assertEqual(result, "python -m pytest")
+
+    def test_AC122_task_empty_args(self):
+        """AC-122: task.args empty returns command only"""
+        result = get_command_string({"task": {"command": "python", "args": []}})
+        self.assertEqual(result, "python")
+
+    def test_AC123_empty_input_returns_empty_string(self):
+        """AC-123: no matching key returns empty string"""
+        result = get_command_string({})
+        self.assertEqual(result, "")
+
+
+# ---------------------------------------------------------------------------
+# ac_rule_engine — evaluate() via tool_input_parser
+# ---------------------------------------------------------------------------
+
+class TestEvaluateViaParser(unittest.TestCase):
+
+    def _make_config(self, tmpdir, rules_by_group):
+        data = {
+            "enabled": True,
+            "write_rules": {"enabled": True, "rules": rules_by_group.get("write", [])},
+            "read_rules": {"enabled": True, "rules": rules_by_group.get("read", [])},
+            "command_rules": {"enabled": True, "rules": rules_by_group.get("command", [])},
+        }
+        return _write_config(tmpdir, data)
+
+    def test_AC130_apply_patch_path_deny(self):
+        """AC-130: apply_patch path matches deny rule"""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            config_path = self._make_config(tmpdir, {"write": [{
+                "rule_id": "r1", "action": "deny",
+                "when": {"path_patterns": [".github/hooks/scripts/**"]},
+            }]})
+            from ac_config_loader import load_config
+            config = load_config(config_path)
+            patch = "*** Update File: c:\\GHC\\.github\\hooks\\scripts\\foo.py"
+            ctx = MatchContext(
+                tool_name="apply_patch",
+                tool_input={"input": patch},
+                cwd="c:\\GHC",
+            )
+            result = evaluate(config, ctx)
+            self.assertIsNotNone(result)
+            self.assertEqual(result.rule.action, "deny")
+
+    def test_AC131_create_and_run_task_command_deny(self):
+        """AC-131: create_and_run_task task.command+args matches deny rule"""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            config_path = self._make_config(tmpdir, {"command": [{
+                "rule_id": "r1", "action": "deny",
+                "when": {"command_patterns": [r"\brm\b"]},
+            }]})
+            from ac_config_loader import load_config
+            config = load_config(config_path)
+            ctx = MatchContext(
+                tool_name="create_and_run_task",
+                tool_input={"task": {"command": "rm", "args": ["-rf", "./dist"]}},
+                cwd="",
+            )
+            result = evaluate(config, ctx)
+            self.assertIsNotNone(result)
+            self.assertEqual(result.rule.action, "deny")
+
+    def test_AC132_send_to_terminal_deny(self):
+        """AC-132: send_to_terminal is evaluated as command tool"""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            config_path = self._make_config(tmpdir, {"command": [{
+                "rule_id": "r1", "action": "deny",
+                "when": {"command_patterns": [r"\bgit\b\s+push\b"]},
+            }]})
+            from ac_config_loader import load_config
+            config = load_config(config_path)
+            ctx = MatchContext(
+                tool_name="send_to_terminal",
+                tool_input={"command": "git push origin main"},
+                cwd="",
+            )
+            result = evaluate(config, ctx)
+            self.assertIsNotNone(result)
+            self.assertEqual(result.rule.action, "deny")
+
+    def test_AC133_grep_search_include_pattern_no_match(self):
+        """AC-133: grep_search includePattern is not a real path, no match on .env rule"""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            config_path = self._make_config(tmpdir, {"read": [{
+                "rule_id": "r1", "action": "deny",
+                "when": {"path_patterns": ["**/.env"]},
+            }]})
+            from ac_config_loader import load_config
+            config = load_config(config_path)
+            ctx = MatchContext(
+                tool_name="grep_search",
+                tool_input={"includePattern": ".env"},
+                cwd="",
+            )
+            result = evaluate(config, ctx)
+            self.assertIsNone(result)
+
+    def test_AC134_workspace_outside_absolute_path_deny(self):
+        """AC-134: absolute path outside workspace is still evaluated (not dropped)"""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            config_path = self._make_config(tmpdir, {"write": [{
+                "rule_id": "r1", "action": "deny",
+                "when": {"path_patterns": ["D:/other/**"]},
+            }]})
+            from ac_config_loader import load_config
+            config = load_config(config_path)
+            ctx = MatchContext(
+                tool_name="create_file",
+                tool_input={"filePath": "D:/other/secret.py"},
+                cwd="C:/GHC",
+            )
+            result = evaluate(config, ctx)
+            self.assertIsNotNone(result)
+            self.assertEqual(result.rule.action, "deny")
 
 
 # ---------------------------------------------------------------------------

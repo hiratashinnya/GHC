@@ -135,3 +135,42 @@
 | AC-094 | 無効な regex パターンが debug ログに記録される | `["\\bdd\\b", "[invalid(regex"]` | `"rm -rf"` | マッチ結果に `[invalid(regex` は含まれず（skip）、debug.log に regex error が記録される |
 | AC-095 | 複数の有効パターンor マッチ | `["\\brm\\b", "\\bdd\\b", "dev-null"]` | `"rm -rf ./dist"` | `["\\brm\\b"]` を返す（複数マッチは全て返す） |
 | AC-096 | 大小文字無視マッチ | `["\\bDD\\b"]` | `"dd if=/dev/zero"` | `["\\bDD\\b"]` を返す（IGNORECASE で小文字dd がマッチ） |
+
+### tool_input_parser.py — get_write_paths()
+
+| テストID | 観点 | tool_name | tool_input | 期待動作 |
+|----------|------|-----------|------------|----------|
+| AC-100 | apply_patch: Update File パスを抽出 | `apply_patch` | `{"input": "*** Update File: c:\\GHC\\docs\\foo.md\n@@..."}` | `["c:\\GHC\\docs\\foo.md"]` を返す |
+| AC-101 | apply_patch: Add/Delete/Update 複数行 | `apply_patch` | input に Update + Add 2行 | 両パスをリストで返す |
+| AC-102 | apply_patch: rename パッチのソースパスのみ返す | `apply_patch` | `{"input": "*** Update File: old.py -> new.py"}` | `["old.py"]` を返す（`-> new.py` は除外） |
+| AC-103 | apply_patch: input が文字列でない場合は空を返す | `apply_patch` | `{"input": 42}` | `[]` を返す |
+| AC-104 | create_directory: dirPath を返す | `create_directory` | `{"dirPath": "src/subdir"}` | `["src/subdir"]` を返す |
+| AC-105 | 非 write ツールは空を返す | `read_file` | `{"filePath": "docs/foo.md"}` | `[]` を返す |
+
+### tool_input_parser.py — get_read_paths()
+
+| テストID | 観点 | tool_name | tool_input | 期待動作 |
+|----------|------|-----------|------------|----------|
+| AC-110 | read_file: filePath を返す | `read_file` | `{"filePath": "docs/foo.md"}` | `["docs/foo.md"]` を返す |
+| AC-111 | get_errors: filePaths リストを返す | `get_errors` | `{"filePaths": ["a.py", "b.py"]}` | `["a.py", "b.py"]` を返す |
+| AC-112 | grep_search: includePattern を返す | `grep_search` | `{"includePattern": "src/**/*.py"}` | `["src/**/*.py"]` を返す |
+| AC-113 | 非 read ツールは空を返す | `apply_patch` | `{"input": "*** Update File: foo.py"}` | `[]` を返す |
+
+### tool_input_parser.py — get_command_string()
+
+| テストID | 観点 | tool_input | 期待動作 |
+|----------|------|------------|----------|
+| AC-120 | command キー直接参照 | `{"command": "git status"}` | `"git status"` を返す |
+| AC-121 | create_and_run_task: task.command + task.args を合成 | `{"task": {"command": "python", "args": ["-m", "pytest"]}}` | `"python -m pytest"` を返す |
+| AC-122 | task.args が空の場合はコマンドのみ | `{"task": {"command": "python", "args": []}}` | `"python"` を返す |
+| AC-123 | どのキーも存在しない場合は空文字 | `{}` | `""` を返す |
+
+### ac_rule_engine.py — ツール分類・評価経路確認（tool_input_parser 経由）
+
+| テストID | 観点 | tool_name | tool_input | rules | 期待動作 |
+|----------|------|-----------|------------|-------|----------|
+| AC-130 | apply_patch のパスが deny ルールにマッチ | `apply_patch` | `{"input": "*** Update File: .github/hooks/scripts/foo.py"}` | deny ルール `.github/hooks/scripts/**` | deny を返す |
+| AC-131 | create_and_run_task のコマンドが deny ルールにマッチ | `create_and_run_task` | `{"task": {"command": "rm", "args": ["-rf", "./dist"]}}` | deny ルール `\\brm\\b` | deny を返す |
+| AC-132 | send_to_terminal が command ツールとして評価される | `send_to_terminal` | `{"command": "git push origin main"}` | deny ルール `\\bgit\\b\\s+push\\b` | deny を返す |
+| AC-133 | grep_search が read ツールとして評価される | `grep_search` | `{"includePattern": ".env"}` | deny ルール `**/.env` | `None` を返す（includePattern はパスでない） |
+| AC-134 | workspace 外絶対パスが評価対象から漏れないこと | `create_file` | `{"filePath": "D:/other/secret.py"}` | deny ルール `D:/other/**` | deny を返す（_to_posix_relative で相対化されず、forward-slash 変換後にマッチ） |
