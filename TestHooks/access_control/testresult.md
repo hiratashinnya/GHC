@@ -3,9 +3,9 @@
 対象スクリプト: `.github/hooks/scripts/access_control.py`
 関連モジュール: `ac_config_loader.py`, `ac_rule_engine.py`
 実行日: 2026-05-18
-コミットID: 8ec1052
+コミットID: 998f043
 実行コマンド: `python c:\GHC\TestHooks\access_control\test_access_control.py`
-総合結果: **FAIL** (79/80)
+総合結果: **PASS** (80/80)
 
 ---
 
@@ -91,25 +91,30 @@
 | AC-130 | TestEvaluateViaParser | apply_patch パスが deny ルールにマッチ | deny を返す | PASS |
 | AC-131 | TestEvaluateViaParser | create_and_run_task コマンドが deny ルールにマッチ | deny を返す | PASS |
 | AC-132 | TestEvaluateViaParser | send_to_terminal が command ツールとして評価 | deny を返す | PASS |
-| AC-133 | TestEvaluateViaParser | grep_search includePattern は path ルールに非マッチ | `None` を返す | FAIL |
+| AC-133 | TestEvaluateViaParser | grep_search includePattern は `**/.env` ルールにマッチ | deny を返す | PASS |
 | AC-134 | TestEvaluateViaParser | workspace 外絶対パスが評価対象から漏れない | deny を返す | PASS |
 
 ### 備考付きサマリ
 
 | テストID | 判定 | 備考 |
 |----------|------|------|
-| AC-133 | FAIL | 実測では `includePattern=".env"` が `**/.env` にマッチし deny となったため、期待値 `None` と不一致。 |
+| AC-133 | 初回FAIL → 再実行PASS | 初回実行（79/80）では `includePattern=".env"` が `**/.env` にマッチして deny となり期待値 `None` と不一致。方針決定後に testcase/test を修正して再実行（80/80）でPASS。 |
 
 ### 失敗詳細
 
 | 項目 | 内容 |
 |------|------|
 | テストID | AC-133 |
-| 実行時の現象 | `evaluate()` が `RuleMatch(... action='deny' ...)` を返却 |
-| テスト期待値 | `None` |
-| 実際値 | deny の `RuleMatch` |
-| 失敗理由 | `grep_search` の `includePattern` を read path として扱う現行ロジックで `**/.env` にマッチしたため |
-| 次アクション | 「`includePattern` を path と見なすか」の仕様方針を決定し、実装またはテスト期待値を統一する |
+| 初回実行（失敗） | 実行日: 2026-05-18 / コミット: `8ec1052` / 結果: FAIL (79/80) |
+| 失敗時の期待値 | `None` |
+| 失敗時の実際値 | deny の `RuleMatch`（`includePattern=".env"` が `**/.env` にマッチ） |
+| 失敗原因 | テスト設計（期待値）と実装方針（`includePattern` を read 評価対象に含める）が不一致 |
+| 対処内容 | 1) `TestHooks/access_control/testcase.md` の AC-133 期待値を deny に修正 2) `TestHooks/access_control/test_access_control.py` の AC-133 を deny 想定に修正 3) `tool_input_parser.py` は read-path 抽出仕様を維持 |
+| 対処理由（意思決定） | ユーザー判断として「現行実装（`includePattern` を read 評価対象として扱う）を正」と確定したため。実装を変えるのではなく、仕様・テスト期待値を実装方針へ整合させた。 |
+| 判断根拠 | 実測で `includePattern=".env"` は `**/.env` にマッチし deny。機密ファイル探索の誤許可を防ぐ保守的方針（fail-closed）と整合。 |
+| 却下した案 | `grep_search.includePattern` を read path から除外する案（スコープ情報扱い）は、現行セキュリティ方針と不整合のため今回不採用。 |
+| 再実行（解消確認） | 実行日: 2026-05-18 / コミット: `998f043` / 結果: PASS (80/80) |
+| 次アクション | 「あるべき姿」検討で、最小変更案と厳密版（scope_patterns 導入）を比較し最終方針を決定する |
 
 ---
 
