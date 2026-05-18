@@ -119,8 +119,8 @@ def get_read_paths(tool_name: str, tool_input: Dict) -> List[str]:
         return [p for p in file_paths if isinstance(p, str) and p]
 
     if tool_name == "grep_search":
-        # includePattern は探索スコープ指定であり、read 対象パスとしては扱わない。
-        return []
+        include_pattern = tool_input.get("includePattern", "")
+        return [include_pattern] if include_pattern else []
 
     if tool_name == "file_search":
         query = tool_input.get("query", "")

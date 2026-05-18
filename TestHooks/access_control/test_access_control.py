@@ -930,9 +930,9 @@ class TestGetReadPaths(unittest.TestCase):
         self.assertEqual(result, ["a.py", "b.py"])
 
     def test_AC112_grep_search_include_pattern(self):
-        """AC-112: grep_search includePattern is scope metadata, not read path"""
+        """AC-112: grep_search returns includePattern"""
         result = get_read_paths("grep_search", {"includePattern": "src/**/*.py"})
-        self.assertEqual(result, [])
+        self.assertEqual(result, ["src/**/*.py"])
 
     def test_AC113_non_read_tool_returns_empty(self):
         """AC-113: non-read tool (apply_patch) returns []"""
@@ -1041,7 +1041,7 @@ class TestEvaluateViaParser(unittest.TestCase):
             self.assertEqual(result.rule.action, "deny")
 
     def test_AC133_grep_search_include_pattern_no_match(self):
-        """AC-133: grep_search includePattern is not a real path, no match on .env rule"""
+        """AC-133: grep_search includePattern '.env' matches '**/.env' and is denied"""
         with tempfile.TemporaryDirectory() as tmp:
             tmpdir = Path(tmp)
             config_path = self._make_config(tmpdir, {"read": [{
@@ -1056,7 +1056,8 @@ class TestEvaluateViaParser(unittest.TestCase):
                 cwd="",
             )
             result = evaluate(config, ctx)
-            self.assertIsNone(result)
+            self.assertIsNotNone(result)
+            self.assertEqual(result.rule.action, "deny")
 
     def test_AC134_workspace_outside_absolute_path_deny(self):
         """AC-134: absolute path outside workspace is still evaluated (not dropped)"""
