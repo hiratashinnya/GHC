@@ -50,7 +50,7 @@ def _sanitize(value: object, max_len: int = 300) -> object:
 def main() -> None:
     args = _parse_args()
     try:
-        payload = read_payload()
+        payload = read_payload(debug=DEBUG)
 
         tool_name: str = payload.get("tool_name") or "(unknown)"
         tool_input: Dict = payload.get("tool_input") or {}
