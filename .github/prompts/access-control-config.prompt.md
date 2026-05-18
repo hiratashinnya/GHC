@@ -105,4 +105,8 @@ Check for:
 - If any test fails, add both sections below:
   1. 備考付きサマリ (note rows for each failed test ID)
   2. 失敗詳細 (期待値 / 実際値 / 原因 / 次アクション)
+- When a failure is addressed later, extend the failure detail with:
+  - 対処理由（意思決定）
+  - 判断根拠（why selected）
+  - 却下した案（rejected options and why）
 - Never change testcase/test assertion only to make the current result look green without explicit policy decision.
