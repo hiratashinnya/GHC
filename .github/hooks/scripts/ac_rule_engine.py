@@ -36,13 +36,19 @@ from __future__ import annotations
 
 import fnmatch
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional
 
 from ac_config_loader import AccessControlConfig, Rule
 import re
 from debug_logging import HookDebugLogger
-from tool_input_parser import get_write_paths, get_read_paths, get_command_string
+from tool_input_parser import (
+    classify_read_input,
+    get_write_paths,
+    get_read_paths,
+    get_command_string,
+)
 
 # ---------------------------------------------------------------------------
 # Tool classification
@@ -79,6 +85,22 @@ COMMAND_TOOLS: frozenset = frozenset({
 
 # deny > confirm（priority リストの先頭が最優先）
 _ACTION_PRIORITY: List[str] = ["deny", "confirm"]
+
+
+class OperationType(Enum):
+    """Operation kind derived from a tool name."""
+
+    WRITE = "write"
+    READ = "read"
+    COMMAND = "command"
+
+
+class OverlapKind(Enum):
+    """Classification for overlap between a requested scope and a protected scope."""
+
+    DEFINITE_INCLUSION = auto()
+    DEFINITE_DISJOINT = auto()
+    UNCERTAIN_OVERLAP = auto()
 
 # ---------------------------------------------------------------------------
 # Public dataclasses
@@ -183,6 +205,25 @@ def _match_path_patterns(patterns: List[str], paths: List[str], cwd: str) -> Lis
     return matched
 
 
+def _literal_prefix(pattern: str) -> str:
+    """Return the literal path prefix before any wildcard segment."""
+    parts = [part for part in pattern.split("/") if part]
+    prefix_parts: List[str] = []
+    for part in parts:
+        if any(token in part for token in ("*", "?", "[")):
+            break
+        prefix_parts.append(part)
+    return "/".join(prefix_parts)
+
+
+def _has_extra_constraints(pattern: str, prefix: str) -> bool:
+    """Return True when pattern constrains matches beyond a plain recursive subtree."""
+    if not prefix:
+        return pattern not in ("**", "**/*", "*")
+    recursive_forms = {f"{prefix}/**", f"{prefix}/**/*", prefix}
+    return pattern not in recursive_forms
+
+
 def _match_command_patterns(patterns: List[str], command: str, debug: Optional[HookDebugLogger] = None) -> List[str]:
     """Command patterns are matched as regexes with IGNORECASE flag."""
     matched = []
@@ -196,10 +237,66 @@ def _match_command_patterns(patterns: List[str], command: str, debug: Optional[H
     return matched
 
 
+def _classify_overlap(request: str, rule: str) -> OverlapKind:
+    """Classify overlap relationship between glob patterns 'request' and 'rule'."""
+    if not request or not rule:
+        return OverlapKind.UNCERTAIN_OVERLAP
+
+    if rule.startswith("**/") and request == rule[3:]:
+        return OverlapKind.DEFINITE_INCLUSION
+
+    # request が全カバー → request が rule を確実に包含
+    if request in ("**", "**/*", "*"):
+        return OverlapKind.DEFINITE_INCLUSION
+
+    request_prefix = _literal_prefix(request)
+    rule_prefix = _literal_prefix(rule)
+
+    if request.endswith("/**") or request.endswith("/**/*"):
+        if request_prefix and rule_prefix:
+            if rule_prefix == request_prefix or rule_prefix.startswith(request_prefix + "/"):
+                if _has_extra_constraints(rule, rule_prefix):
+                    return OverlapKind.UNCERTAIN_OVERLAP
+                return OverlapKind.DEFINITE_INCLUSION
+
+    # 明確に非交差: ルートレベルが異なり、どちらも ** で始まらない
+    request_root = request.split("/")[0]
+    rule_root = rule.split("/")[0]
+    if request_root != "**" and rule_root != "**" and request_root != rule_root:
+        return OverlapKind.DEFINITE_DISJOINT
+    
+    # その他は不確実交差
+    return OverlapKind.UNCERTAIN_OVERLAP
+
+
+def _match_scope_patterns(request: str, patterns: List[str]) -> Optional[OverlapKind]:
+    """Return overlap classification for a scope-like request against rule patterns.
+
+    Returns:
+        OverlapKind.DEFINITE_INCLUSION if request certainly includes a protected scope,
+        OverlapKind.UNCERTAIN_OVERLAP if overlap cannot be ruled out,
+        None if all patterns are definitely disjoint.
+    """
+    if not request or not patterns:
+        return None
+
+    has_uncertain = False
+    for pattern in patterns:
+        overlap = _classify_overlap(request, pattern)
+        if overlap == OverlapKind.DEFINITE_INCLUSION:
+            return OverlapKind.DEFINITE_INCLUSION
+        if overlap == OverlapKind.UNCERTAIN_OVERLAP:
+            has_uncertain = True
+
+    if has_uncertain:
+        return OverlapKind.UNCERTAIN_OVERLAP
+    return None
+
+
 def _matches_rule(
     rule: Rule,
     context: MatchContext,
-    operation_type: str,
+    operation_type: OperationType,
     debug: Optional[HookDebugLogger] = None,
 ) -> Optional[RuleMatch]:
     """ルールがコンテキストにマッチするか判定する。マッチすれば RuleMatch を返す。
@@ -210,17 +307,61 @@ def _matches_rule(
     """
     when = rule.when
 
-    if operation_type in ("write", "read"):
+    if operation_type in (OperationType.WRITE, OperationType.READ):
         paths = _get_paths_from_tool_input(context.tool_name, context.tool_input)
+
+        if operation_type == OperationType.WRITE:
+            if when.path_patterns:
+                matched = _match_path_patterns(when.path_patterns, paths, context.cwd)
+                if matched:
+                    return RuleMatch(rule=rule, matched_values=matched)
+                return None
+            return RuleMatch(rule=rule, matched_values=paths)
+
+        concrete_paths: List[str] = []
+        scope_values: List[str] = []
+        ambiguous_values: List[str] = []
+        for path_str in paths:
+            input_kind = classify_read_input(context.tool_name, path_str)
+            if input_kind == "concrete_paths":
+                concrete_paths.append(path_str)
+            elif input_kind == "scope_patterns":
+                scope_values.append(path_str)
+            else:
+                ambiguous_values.append(path_str)
+
         if when.path_patterns:
-            matched = _match_path_patterns(when.path_patterns, paths, context.cwd)
+            matched = _match_path_patterns(when.path_patterns, concrete_paths, context.cwd)
             if matched:
                 return RuleMatch(rule=rule, matched_values=matched)
-            return None
-        # path_patterns 未指定 → 全パスにマッチ
-        return RuleMatch(rule=rule, matched_values=paths)
 
-    if operation_type == "command":
+        scope_patterns = when.scope_patterns or when.path_patterns
+        if scope_patterns:
+            for scope_value in scope_values:
+                overlap = _match_scope_patterns(scope_value, scope_patterns)
+                if overlap == OverlapKind.DEFINITE_INCLUSION:
+                    return RuleMatch(rule=rule, matched_values=[scope_value])
+                if overlap == OverlapKind.UNCERTAIN_OVERLAP and rule.action == "confirm":
+                    return RuleMatch(rule=rule, matched_values=[scope_value])
+
+        if not paths and context.tool_name in ("grep_search", "file_search"):
+            raw_scope_value = ""
+            if context.tool_name == "grep_search":
+                raw_scope_value = context.tool_input.get("includePattern", "")
+            if context.tool_name == "file_search":
+                raw_scope_value = context.tool_input.get("query", "")
+            if raw_scope_value == "" and rule.action == "confirm":
+                return RuleMatch(rule=rule, matched_values=[raw_scope_value])
+
+        if ambiguous_values and rule.action == "confirm":
+            return RuleMatch(rule=rule, matched_values=ambiguous_values)
+
+        if not when.path_patterns and not when.scope_patterns:
+            return RuleMatch(rule=rule, matched_values=paths)
+
+        return None
+
+    if operation_type == OperationType.COMMAND:
         command = _get_command_from_tool_input(context.tool_input)
         if when.command_patterns:
             matched_patterns = _match_command_patterns(when.command_patterns, command, debug=debug)
@@ -237,20 +378,20 @@ def _matches_rule(
 # Operation type resolution
 # ---------------------------------------------------------------------------
 
-def _determine_operation_type(tool_name: str) -> Optional[str]:
-    """ツール名から操作タイプ（"write" / "read" / "command"）を決定する。"""
+def _determine_operation_type(tool_name: str) -> Optional[OperationType]:
+    """ツール名から操作タイプを決定する。"""
     if tool_name in WRITE_TOOLS:
-        return "write"
+        return OperationType.WRITE
     if tool_name in READ_TOOLS:
-        return "read"
+        return OperationType.READ
     if tool_name in COMMAND_TOOLS:
-        return "command"
+        return OperationType.COMMAND
     return None
 
 
-def _get_candidate_rules(config: AccessControlConfig, operation_type: str) -> List[Rule]:
+def _get_candidate_rules(config: AccessControlConfig, operation_type: OperationType) -> List[Rule]:
     """操作タイプに対応するグループが有効な場合そのルールリストを、無効な場合空リストを返す。"""
-    group = config.get_group(operation_type)
+    group = config.get_group(operation_type.value)
     return group.rules if group.enabled else []
 
 

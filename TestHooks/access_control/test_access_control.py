@@ -66,24 +66,26 @@ def _make_config(
     )
 
 
-def _deny_rule(rule_id: str, path_patterns=None, command_patterns=None) -> Rule:
+def _deny_rule(rule_id: str, path_patterns=None, command_patterns=None, scope_patterns=None) -> Rule:
     return Rule(
         rule_id=rule_id,
         action="deny",
         when=WhenClause(
             path_patterns=path_patterns or [],
             command_patterns=command_patterns or [],
+            scope_patterns=scope_patterns or [],
         ),
     )
 
 
-def _confirm_rule(rule_id: str, path_patterns=None, command_patterns=None) -> Rule:
+def _confirm_rule(rule_id: str, path_patterns=None, command_patterns=None, scope_patterns=None) -> Rule:
     return Rule(
         rule_id=rule_id,
         action="confirm",
         when=WhenClause(
             path_patterns=path_patterns or [],
             command_patterns=command_patterns or [],
+            scope_patterns=scope_patterns or [],
         ),
     )
 
@@ -242,6 +244,36 @@ class TestLoadConfig(unittest.TestCase):
         config = load_config(path)
         self.assertEqual(config.command_rules.rules[0].when.command_patterns, ["rm -rf", "rd /s /q"])
 
+    def test_AC008a_parse_when_scope_patterns(self):
+        """_parse_when: scope_patterns を正しく格納する"""
+        data = {
+            "read_rules": [
+                {"id": "r1", "action": "deny", "when": {"scope_patterns": ["**/.env"]}}
+            ]
+        }
+        path = _write_config(self.tmppath, data)
+        config = load_config(path)
+        self.assertEqual(config.read_rules.rules[0].when.scope_patterns, ["**/.env"])
+
+    def test_AC008b_parse_when_path_and_scope_patterns(self):
+        """_parse_when: path_patterns と scope_patterns の両方を正しく格納する"""
+        data = {
+            "read_rules": [
+                {
+                    "id": "r1",
+                    "action": "deny",
+                    "when": {
+                        "path_patterns": ["docs/**"],
+                        "scope_patterns": ["docs/**"],
+                    },
+                }
+            ]
+        }
+        path = _write_config(self.tmppath, data)
+        config = load_config(path)
+        self.assertEqual(config.read_rules.rules[0].when.path_patterns, ["docs/**"])
+        self.assertEqual(config.read_rules.rules[0].when.scope_patterns, ["docs/**"])
+
 
 # ---------------------------------------------------------------------------
 # ac_rule_engine — write operations
@@ -379,6 +411,87 @@ class TestEvaluateReadRules(unittest.TestCase):
             read_rules=[_deny_rule("r1", path_patterns=[])]
         )
         ctx = MatchContext(tool_name="read_file", tool_input={"filePath": "any/file.txt"})
+        result = evaluate(config, ctx)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.rule.action, "deny")
+
+    def test_AC140_scope_definite_inclusion_global_search_deny(self):
+        """read: global grep scope definitely includes protected env files → deny"""
+        config = _make_config(
+            read_rules=[_deny_rule("r1", scope_patterns=["**/.env"])]
+        )
+        ctx = MatchContext(tool_name="grep_search", tool_input={"includePattern": "**/*"})
+        result = evaluate(config, ctx)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.rule.action, "deny")
+
+    def test_AC141_scope_parent_subtree_deny(self):
+        """read: parent subtree grep definitely includes child protected subtree → deny"""
+        config = _make_config(
+            read_rules=[_deny_rule("r1", scope_patterns=[".github/hooks/**"])]
+        )
+        ctx = MatchContext(tool_name="grep_search", tool_input={"includePattern": ".github/**"})
+        result = evaluate(config, ctx)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.rule.action, "deny")
+
+    def test_AC142_scope_uncertain_overlap_confirm(self):
+        """read: wider src grep with narrower env rule is uncertain overlap → confirm"""
+        config = _make_config(
+            read_rules=[_confirm_rule("r1", scope_patterns=["src/**/*.env"])]
+        )
+        ctx = MatchContext(tool_name="grep_search", tool_input={"includePattern": "src/**"})
+        result = evaluate(config, ctx)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.rule.action, "confirm")
+
+    def test_AC143_scope_definite_disjoint_allows(self):
+        """read: disjoint grep scope does not match protected scopes"""
+        config = _make_config(
+            read_rules=[
+                _deny_rule("r1", scope_patterns=["**/.env"]),
+                _confirm_rule("r2", scope_patterns=[".github/**"]),
+            ]
+        )
+        ctx = MatchContext(tool_name="grep_search", tool_input={"includePattern": "docs/**"})
+        self.assertIsNone(evaluate(config, ctx))
+
+    def test_AC144_ambiguous_empty_include_pattern_confirm(self):
+        """read: empty grep includePattern is treated as ambiguous and defaults to confirm"""
+        config = _make_config(
+            read_rules=[_confirm_rule("r1", scope_patterns=["**/.env"])]
+        )
+        ctx = MatchContext(tool_name="grep_search", tool_input={"includePattern": ""})
+        result = evaluate(config, ctx)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.rule.action, "confirm")
+
+    def test_AC145_file_search_global_scope_deny(self):
+        """read: file_search global query definitely includes protected secret files → deny"""
+        config = _make_config(
+            read_rules=[_deny_rule("r1", scope_patterns=["**/*.secret"])]
+        )
+        ctx = MatchContext(tool_name="file_search", tool_input={"query": "**/*"})
+        result = evaluate(config, ctx)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.rule.action, "deny")
+
+    def test_AC146_concrete_path_match_has_priority(self):
+        """read: concrete path match still wins immediately even if scope patterns also exist"""
+        config = _make_config(
+            read_rules=[_deny_rule("r1", path_patterns=["**/.env"], scope_patterns=["**/*.env"])]
+        )
+        ctx = MatchContext(tool_name="read_file", tool_input={"filePath": ".env"})
+        result = evaluate(config, ctx)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.rule.action, "deny")
+
+    def test_AC147_scope_fallback_to_path_patterns_for_backward_compat(self):
+        """read: scope_patterns omitted falls back to path_patterns for search scope evaluation"""
+        config = _make_config(
+            read_rules=[_deny_rule("r1", path_patterns=["**/.env"])]
+        )
+        ctx = MatchContext(tool_name="grep_search", tool_input={"includePattern": ".env"})
         result = evaluate(config, ctx)
         self.assertIsNotNone(result)
         self.assertEqual(result.rule.action, "deny")

@@ -174,3 +174,25 @@
 | AC-132 | send_to_terminal が command ツールとして評価される | `send_to_terminal` | `{"command": "git push origin main"}` | deny ルール `\\bgit\\b\\s+push\\b` | deny を返す |
 | AC-133 | grep_search が read ツールとして評価される | `grep_search` | `{"includePattern": ".env"}` | deny ルール `**/.env` | deny を返す（`.env` は `**/.env` にマッチ） |
 | AC-134 | workspace 外絶対パスが評価対象から漏れないこと | `create_file` | `{"filePath": "D:/other/secret.py"}` | deny ルール `D:/other/**` | deny を返す（_to_posix_relative で相対化されず、forward-slash 変換後にマッチ） |
+
+### Scope Patterns 判定（ac_rule_engine.py — read 系 scope_patterns 導入）
+
+#### WhenClause scope_patterns パース
+
+| テストID | 観点 | 入力 | 期待動作 |
+|----------|------|------|----------|
+| AC-008a | `_parse_when` scope_patterns のみ | `{"scope_patterns": ["**/.env"]}` | `WhenClause.scope_patterns` に格納される |
+| AC-008b | `_parse_when` path + scope 両方 | `{"path_patterns": ["docs/**"], "scope_patterns": ["docs/**"]}` | 両フィールドに正しく格納される |
+
+#### Scope patterns マッチング（glob 交差判定）
+
+| テストID | 観点 | tool_name | tool_input | rules (scope_patterns) | 期待動作 |
+|----------|------|-----------|------------|------------------------|----------|
+| AC-140 | scope 明確包含: request=wider, rule=narrower | `grep_search` | `{"includePattern": "**/*"}` | deny ルール `**/.env` | deny を返す（全体検索は `.env` を必ず含む） |
+| AC-141 | scope 明確包含: request=parent, rule=child | `grep_search` | `{"includePattern": ".github/**"}` | deny ルール `.github/hooks/**` | deny を返す（request が rule を包含） |
+| AC-142 | scope 不確実交差: request=wider, rule=narrower | `grep_search` | `{"includePattern": "src/**"}` | deny ルール `src/**/*.env` | confirm を返す（request が wider だが確実でない） |
+| AC-143 | scope 明確非交差 | `grep_search` | `{"includePattern": "docs/**"}` | deny ルール `**/.env`, confirm ルール `.github/**` | `None` を返す（どちらも non-overlapping） |
+| AC-144 | ambiguous_read（空 includePattern） | `grep_search` | `{"includePattern": ""}` | deny ルール `**/.env` (scope_patterns) | confirm を返す（ambiguous 既定値） |
+| AC-145 | file_search query = scope 明確包含 | `file_search` | `{"query": "**/*"}` | deny ルール `**/*.secret` | deny を返す（全体検索は `*.secret` を必ず含む） |
+| AC-146 | concrete と scope 両マッチ時の優先（concrete 側 deny） | `read_file` | `{"filePath": ".env"}` | deny ルール（path_patterns=`**/.env`, scope_patterns=`**/*.env`） | deny を返す（path_patterns で即マッチ） |
+| AC-147 | 後方互換: scope_patterns 未指定時に path_patterns を使用 | `grep_search` | `{"includePattern": ".env"}` | deny ルール、when.scope_patterns 未指定で when.path_patterns=`**/.env` | deny を返す（従来動作の互換） |

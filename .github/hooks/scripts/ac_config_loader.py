@@ -46,6 +46,7 @@ class WhenClause:
     """
     path_patterns: List[str] = field(default_factory=list)
     command_patterns: List[str] = field(default_factory=list)
+    scope_patterns: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -111,6 +112,7 @@ def _parse_when(raw_when: dict) -> WhenClause:
     return WhenClause(
         path_patterns=list(raw_when.get("path_patterns") or []),
         command_patterns=list(raw_when.get("command_patterns") or []),
+        scope_patterns=list(raw_when.get("scope_patterns") or []),
     )
 
 

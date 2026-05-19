@@ -164,3 +164,30 @@ def get_command_string(tool_input: Dict) -> str:
         return cmd
 
     return ""
+
+
+# ---------------------------------------------------------------------------
+# Read input classification (scope_patterns support)
+# ---------------------------------------------------------------------------
+
+def classify_read_input(tool_name: str, value: str) -> str:
+    """Classify read input as concrete_paths, scope_patterns, or ambiguous.
+    
+    責務: read ツール入力を分類する。
+    入力: tool_name — 読み取りツール名、value — 抽出された値。
+    出力: "concrete_paths" / "scope_patterns" / "ambiguous"。
+    副作用: なし。
+    """
+    if not value:
+        return "ambiguous"
+    
+    # grep_search, file_search は探索スコープ → scope_patterns
+    if tool_name in ("grep_search", "file_search"):
+        return "scope_patterns"
+    
+    # read_file, list_dir, get_errors は実ファイル実体 → concrete_paths
+    if tool_name in ("read_file", "list_dir", "view_image", "get_errors", "read_notebook_cell_output", "copilot_getNotebookSummary", "get_changed_files"):
+        return "concrete_paths"
+    
+    # その他は不確実
+    return "ambiguous"
