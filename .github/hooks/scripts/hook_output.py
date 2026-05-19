@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from typing import Any, Dict
 
 EXIT_OK: int = 0
@@ -46,4 +47,5 @@ def _with_output_aliases(data: Dict[str, Any]) -> Dict[str, Any]:
 
 def emit_output(data: Dict[str, Any]) -> None:
     """Write compact JSON to stdout (1 line, UTF-8)."""
-    print(json.dumps(_with_output_aliases(data), ensure_ascii=False))
+    output = json.dumps(_with_output_aliases(data), ensure_ascii=False)
+    sys.stdout.buffer.write(output.encode('utf-8') + b'\n')
