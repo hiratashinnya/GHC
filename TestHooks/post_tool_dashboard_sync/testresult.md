@@ -1,6 +1,6 @@
 # testresult: post_tool_dashboard_sync.py
 
-対象スクリプト: `.github/hooks/scripts/post_tool_dashboard_sync.py`
+対象スクリプト: `.github/hooks/scripts/entrypoints/post_tool_dashboard_sync.py`
 実行日: 2026-05-05
 コミットID: 32ed3c0
 実行コマンド: `python -m unittest test_post_tool_dashboard_sync -v`

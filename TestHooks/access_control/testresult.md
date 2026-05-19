@@ -1,6 +1,6 @@
 # testresult: access_control hook
 
-対象スクリプト: `.github/hooks/scripts/access_control.py`
+対象スクリプト: `.github/hooks/scripts/entrypoints/access_control.py`
 関連モジュール: `ac_config_loader.py`, `ac_rule_engine.py`
 実行日: 2026-05-19
 コミットID: 53a9111

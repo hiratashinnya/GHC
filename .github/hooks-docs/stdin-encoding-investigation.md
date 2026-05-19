@@ -111,7 +111,7 @@ sys.stdin.buffer  (バイト層)   … エンコーディングなし。生バ�
 ```json
 {
   "type": "command",
-  "command": "python .github/hooks/scripts/tool_input_spy.py",
+  "command": "python .github/hooks/scripts/entrypoints/tool_input_spy.py",
   "env": {
     "PYTHONUTF8": "1"
   }

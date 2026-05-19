@@ -6,10 +6,10 @@
 
 Debug enable/disable
 --------------------
-ON  : create  .github/hooks/scripts/access_control.debug
-OFF : delete  .github/hooks/scripts/access_control.debug
+ON  : create  .github/hooks/scripts/entrypoints/access_control.debug
+OFF : delete  .github/hooks/scripts/entrypoints/access_control.debug
 
-Log file : .github/hooks/scripts/access_control.debug.log
+Log file : .github/hooks/scripts/entrypoints/access_control.debug.log
 """
 
 from __future__ import annotations
@@ -17,13 +17,17 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPTS_DIR = SCRIPT_DIR.parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
 from debug_logging import HookDebugLogger
 from hook_payload import get_hook_input, PreToolUsePayload
 from ac_config_loader import load_config
 from ac_rule_engine import MatchContext, RuleMatch, evaluate
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-CONFIG_PATH = SCRIPT_DIR.parent / "config" / "access-control.json"
+CONFIG_PATH = SCRIPTS_DIR.parent / "config" / "access-control.json"
 
 DEBUG = HookDebugLogger(SCRIPT_DIR, "access_control")
 

@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 
 SCRIPTS_DIR = Path(r"c:\GHC\.github\hooks\scripts")
 sys.path.insert(0, str(SCRIPTS_DIR))
+sys.path.insert(0, str(SCRIPTS_DIR / "entrypoints"))
 
 from hook_payload import PostToolUsePayload
 from post_tool_dashboard_sync import _should_skip, _build_patch_cmd

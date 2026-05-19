@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 
 SCRIPTS_DIR = Path(r"c:\GHC\.github\hooks\scripts")
 sys.path.insert(0, str(SCRIPTS_DIR))
+sys.path.insert(0, str(SCRIPTS_DIR / "entrypoints"))
 
 from ac_config_loader import (
     WhenClause,

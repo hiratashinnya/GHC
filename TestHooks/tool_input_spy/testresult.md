@@ -1,6 +1,6 @@
 # testresult: tool_input_spy.py
 
-対象スクリプト: `.github/hooks/scripts/tool_input_spy.py`
+対象スクリプト: `.github/hooks/scripts/entrypoints/tool_input_spy.py`
 実行日: 2026-05-05
 コミットID: 32ed3c0
 実行コマンド: `python -m unittest test_tool_input_spy -v`

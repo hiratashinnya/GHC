@@ -6,22 +6,27 @@ Always returns {"continue": true} — never blocks execution.
 
 Debug enable/disable
 --------------------
-ON  : create  .github/hooks/scripts/tool_input_spy.debug
-OFF : delete  .github/hooks/scripts/tool_input_spy.debug
+ON  : create  .github/hooks/scripts/entrypoints/tool_input_spy.debug
+OFF : delete  .github/hooks/scripts/entrypoints/tool_input_spy.debug
 
-Log file : .github/hooks/scripts/tool_input_spy.debug.log
+Log file : .github/hooks/scripts/entrypoints/tool_input_spy.debug.log
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 from typing import Dict
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPTS_DIR = SCRIPT_DIR.parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
 
 from debug_logging import HookDebugLogger
 from hook_payload import read_payload
 
-SCRIPT_DIR = Path(__file__).resolve().parent
 DEBUG = HookDebugLogger(SCRIPT_DIR, "tool_input_spy")
 
 
