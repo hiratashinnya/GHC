@@ -2,10 +2,10 @@
 
 対象スクリプト: `.github/hooks/scripts/access_control.py`
 関連モジュール: `ac_config_loader.py`, `ac_rule_engine.py`
-実行日: 2026-05-18
-コミットID: 998f043
-実行コマンド: `python c:\GHC\TestHooks\access_control\test_access_control.py`
-総合結果: **PASS** (80/80)
+実行日: 2026-05-19
+コミットID: 53a9111
+実行コマンド: `c:/GHC/.venv/Scripts/python.exe TestHooks/access_control/test_access_control.py`
+総合結果: **PASS** (90/90)
 
 ---
 
@@ -23,6 +23,8 @@
 | AC-006 | TestLoadConfig | `_parse_when` path_patterns | `WhenClause.path_patterns` に格納 | PASS |
 | AC-007 | TestLoadConfig | `_parse_when` command_patterns | `WhenClause.command_patterns` に格納 | PASS |
 | AC-008 | TestEnabledDisable | グローバル `enabled=False` → 全ルール無効 | `None` | PASS |
+| AC-008a | TestLoadConfig | `_parse_when` scope_patterns | `WhenClause.scope_patterns` に格納 | PASS |
+| AC-008b | TestLoadConfig | `_parse_when` path_patterns + scope_patterns | 両フィールドに正しく格納 | PASS |
 | AC-010 | TestEvaluateWriteRules | write: ルールなし → allow | `None` | PASS |
 | AC-011 | TestEvaluateWriteRules | write: パスマッチ → deny | deny `RuleMatch` | PASS |
 | AC-012 | TestEvaluateWriteRules | write: パスマッチ → confirm | confirm `RuleMatch` | PASS |
@@ -35,6 +37,14 @@
 | AC-021 | TestEvaluateReadRules | read: `.env` → deny（`**/` prefix 正規化） | deny を返す | PASS |
 | AC-022 | TestEvaluateReadRules | read: `list_dir` パス不一致 → allow | `None` | PASS |
 | AC-023 | TestEvaluateReadRules | read: path_patterns 未指定 → 全マッチ | deny を返す | PASS |
+| AC-140 | TestEvaluateReadRules | read: 全体 grep scope が保護 `.env` スコープを包含 | deny を返す | PASS |
+| AC-141 | TestEvaluateReadRules | read: 親 subtree grep が子保護 subtree を包含 | deny を返す | PASS |
+| AC-142 | TestEvaluateReadRules | read: `src/**` と `src/**/*.env` の不確実交差 | confirm を返す | PASS |
+| AC-143 | TestEvaluateReadRules | read: `docs/**` と保護 scope 群は明確非交差 | `None` | PASS |
+| AC-144 | TestEvaluateReadRules | read: 空 includePattern は ambiguous 扱い | confirm を返す | PASS |
+| AC-145 | TestEvaluateReadRules | read: file_search 全体 query が `*.secret` を包含 | deny を返す | PASS |
+| AC-146 | TestEvaluateReadRules | read: concrete path match が scope match より先に効く | deny を返す | PASS |
+| AC-147 | TestEvaluateReadRules | read: scope_patterns 未指定時の path_patterns 後方互換 | deny を返す | PASS |
 | AC-030 | TestEvaluateCommandRules | command: ルールなし → allow | `None` | PASS |
 | AC-031 | TestEvaluateCommandRules | command: `rm -rf` → deny | deny を返す | PASS |
 | AC-032 | TestEvaluateCommandRules | command: 大小文字無視マッチ | deny を返す | PASS |
@@ -132,3 +142,4 @@
 | 8 | AC-092〜AC-096 | コマンドパターンの部分一致で `git add` が `dd` と誤判定されるリスク | `ac_rule_engine.py` を regex マッチング化し、`\b` 境界付きパターン運用に変更。無効 regex は debug ログ出力して skip |
 | 9 | AC-092〜AC-096 | 設定側 regex の妥当性未検証 | `ac_config_loader.py` で `command_patterns` を `re.compile` 検証し、無効パターンを `skipped_rules` に収集 |
 | 10 | — | tool_input 解析ロジックが ac_rule_engine に混在していた | `tool_input_parser.py` に parser を分離し、`hook_event.py` をファサード化、`ac_rule_engine.py` を委譲形式に変更 |
+| 11 | AC-008a/008b, AC-140〜AC-147 | read 系の探索スコープと具体パスが同一 `path_patterns` に混在し、deny/confirm の意味論が曖昧 | `scope_patterns` を設定・ローダ・ルール評価へ追加し、`OperationType` / `OverlapKind` で型を明示。read 評価では `concrete_paths` と `scope_patterns` を分離し、包含は deny、不確実交差は confirm、空スコープは confirm 既定、未設定時は `path_patterns` へ後方互換フォールバックするよう修正 |
