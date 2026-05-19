@@ -27,7 +27,7 @@ from hook_payload import get_hook_input, PreToolUsePayload
 from ac_config_loader import load_config
 from ac_rule_engine import MatchContext, RuleMatch, evaluate
 
-CONFIG_PATH = SCRIPTS_DIR.parent / "config" / "access-control.json"
+CONFIG_PATH = SCRIPT_DIR.parent.parent / "config" / "access-control.json"
 
 DEBUG = HookDebugLogger(SCRIPT_DIR, "access_control")
 
