@@ -1,12 +1,25 @@
 # testresult: hook_payload.py
 
 対象スクリプト: `.github/hooks/scripts/core/hook_payload.py`
-実行日: 2026年5月17日
-コミットID: 07e63e2
-実行コマンド: `python -m unittest test_hook_payload -v`
-総合結果: **PASS** (55/55)
+実行日: 2026-05-20
+コミットID: 9274932
+実行コマンド: `cd TestHooks/hook_payload && python -m unittest test_hook_payload -v`
+総合結果: **FAIL** (32/55, errors=23)
 
 ---
+
+## 備考付きサマリ（失敗行の注記）
+
+- 失敗対象: 出力系メソッドのテスト（HP-024/025, HP-029-049 の一部）
+- 共通エラー: `AttributeError: '_io.StringIO' object has no attribute 'buffer'`
+- 発生箇所: `core/hook_output.py` の `emit_output()` が `sys.stdout.buffer.write(...)` を前提としているため、`StringIO` を使うテストで失敗
+
+## 失敗詳細（期待値/実際値/原因/次アクション）
+
+- 期待値: 各メソッド（`warn`/`deny`/`ask`/`stop_session`/`update_input`/`add_context` など）が stdout に JSON を出力し、`EXIT_OK` を返す。
+- 実際値: `emit_output()` 呼び出し時に `AttributeError` が送出され、23テストが ERROR になった。
+- 原因: テスト環境の `sys.stdout` が `StringIO` のため `.buffer` 属性を持たない。
+- 次アクション: `emit_output()` を `TextIO`/`BinaryIO` 両対応にするか、テスト側 stdout モックを `.buffer` 対応に変更して整合を取る。
 
 ## テスト結果
 

@@ -1,9 +1,9 @@
 # testresult: debug_logging.py
 
 対象スクリプト: `.github/hooks/scripts/shared/debug_logging.py`
-実行日: 2026-05-05
-コミットID: 32ed3c0
-実行コマンド: `python -m unittest test_debug_logging -v`
+実行日: 2026-05-20
+コミットID: 9274932
+実行コマンド: `cd TestHooks/debug_logging && python -m unittest test_debug_logging -v`
 総合結果: **PASS** (9/9)
 
 ---

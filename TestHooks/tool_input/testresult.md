@@ -1,9 +1,9 @@
 # testresult: tool_input.py
 
 対象スクリプト: `.github/hooks/scripts/tooling/tool_input.py`
-実行日: 2026-05-05
-コミットID: 32ed3c0
-実行コマンド: `python -m unittest test_tool_input -v`
+実行日: 2026-05-20
+コミットID: 9274932
+実行コマンド: `cd TestHooks/tool_input && python -m unittest test_tool_input -v`
 総合結果: **PASS** (21/21)
 
 ---
