@@ -1,6 +1,6 @@
 # testresult: hook_payload.py
 
-対象スクリプト: `.github/hooks/scripts/hook_payload.py`
+対象スクリプト: `.github/hooks/scripts/core/hook_payload.py`
 実行日: 2026年5月17日
 コミットID: 07e63e2
 実行コマンド: `python -m unittest test_hook_payload -v`

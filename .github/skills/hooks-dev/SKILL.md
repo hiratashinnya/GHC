@@ -33,12 +33,12 @@ Use this skill when you need to:
 | [hooks-docs/payload-PreCompact.md](../hooks-docs/payload-PreCompact.md) | Pre-compaction state save |
 | [hooks-docs/tool-input-schema.md](../hooks-docs/tool-input-schema.md) | All tool_input schemas, read/write classification table |
 | [hooks-docs/hook-template.md](../hooks-docs/hook-template.md) | Full checklist, Python template, blocking pattern examples |
-| [hooks/scripts/hook_template.py](../hooks/scripts/hook_template.py) | Python hook script template with `HookOutput` usage examples |
-| [hooks/scripts/hook_payload.py](../hooks/scripts/hook_payload.py) | facade: `get_hook_input()`, `get_hook_input_as()`, backward-compatible re-exports |
-| [hooks/scripts/hook_input.py](../hooks/scripts/hook_input.py) | stdin read, JSON parse, high-level typed input helpers |
-| [hooks/scripts/hook_event.py](../hooks/scripts/hook_event.py) | typed dataclasses for all 8 events, `parse_payload()` |
-| [hooks/scripts/hook_output.py](../hooks/scripts/hook_output.py) | output aliasing, `emit_output()`, `EXIT_OK` / `EXIT_BLOCK` |
-| [hooks/scripts/tool_input.py](../hooks/scripts/tool_input.py) | `WRITE_TOOLS`/`READ_TOOLS`, `get_written_paths()`, `get_read_paths()` |
+| [hooks/scripts/templates/hook-template.py](../hooks/scripts/templates/hook-template.py) | Python hook script template with `HookOutput` usage examples |
+| [hooks/scripts/core/hook_payload.py](../hooks/scripts/core/hook_payload.py) | facade: `get_hook_input()`, `get_hook_input_as()`, backward-compatible re-exports |
+| [hooks/scripts/core/hook_input.py](../hooks/scripts/core/hook_input.py) | stdin read, JSON parse, high-level typed input helpers |
+| [hooks/scripts/core/hook_event.py](../hooks/scripts/core/hook_event.py) | typed dataclasses for all 8 events, `parse_payload()` |
+| [hooks/scripts/core/hook_output.py](../hooks/scripts/core/hook_output.py) | output aliasing, `emit_output()`, `EXIT_OK` / `EXIT_BLOCK` |
+| [hooks/scripts/tooling/tool_input.py](../hooks/scripts/tooling/tool_input.py) | `WRITE_TOOLS`/`READ_TOOLS`, `get_written_paths()`, `get_read_paths()` |
 
 ---
 

@@ -41,7 +41,7 @@
 | ------ | ------------ |
 | PreToolUse フェーズゲート強制 | `.github/hooks/phase-gate.json` + `.github/hooks/scripts/entrypoints/check_phase_gate.py` |
 | PostToolUse ダッシュボード自動更新 | `.github/hooks/dashboard-sync.json` + `.github/hooks/scripts/entrypoints/post_tool_dashboard_sync.py` |
-| フック共通デバッグロギング | `.github/hooks/scripts/debug_logging.py` |
+| フック共通デバッグロギング | `.github/hooks/scripts/shared/debug_logging.py` |
 
 ### スクリプト実装（`.github/scripts/`）
 

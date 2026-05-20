@@ -1,7 +1,7 @@
 # stdin エンコーディング調査レポート
 
 調査日: 2026-05-04  
-対象ファイル: `.github/hooks/scripts/hook_payload.py`  
+対象ファイル: `.github/hooks/scripts/core/hook_payload.py`  
 発端: `tool_input_spy.py` で `UnicodeEncodeError: surrogates not allowed` が発生
 
 ---

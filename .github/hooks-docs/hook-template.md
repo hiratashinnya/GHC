@@ -44,10 +44,10 @@
 
 ## Python テンプレート（最小版）
 
-テンプレートファイル: [.github/hooks/scripts/hook-template.py](../hooks/scripts/hook-template.py)
-ペイロード facade: [.github/hooks/scripts/hook_payload.py](../hooks/scripts/hook_payload.py)
-内部ライブラリ: [.github/hooks/scripts/hook_input.py](../hooks/scripts/hook_input.py) / [.github/hooks/scripts/hook_event.py](../hooks/scripts/hook_event.py) / [.github/hooks/scripts/hook_output.py](../hooks/scripts/hook_output.py)
-ツール入力ライブラリ: [.github/hooks/scripts/tool_input.py](../hooks/scripts/tool_input.py)
+テンプレートファイル: [.github/hooks/scripts/templates/hook-template.py](../hooks/scripts/templates/hook-template.py)
+ペイロード facade: [.github/hooks/scripts/core/hook_payload.py](../hooks/scripts/core/hook_payload.py)
+内部ライブラリ: [.github/hooks/scripts/core/hook_input.py](../hooks/scripts/core/hook_input.py) / [.github/hooks/scripts/core/hook_event.py](../hooks/scripts/core/hook_event.py) / [.github/hooks/scripts/core/hook_output.py](../hooks/scripts/core/hook_output.py)
+ツール入力ライブラリ: [.github/hooks/scripts/tooling/tool_input.py](../hooks/scripts/tooling/tool_input.py)
 
 新しいスクリプトを作成する際は `hook-template.py` をコピーして使用すること。
 出力制御は `event.method(...)` パターンのみを使う。`print(json.dumps(...))` や `sys.exit(2)` を直接書かないこと。

@@ -1,6 +1,6 @@
 # testcase: hook_payload.py
 
-対象スクリプト: `.github/hooks/scripts/hook_payload.py`
+対象スクリプト: `.github/hooks/scripts/core/hook_payload.py`
 
 ---
 

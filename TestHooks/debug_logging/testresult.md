@@ -1,6 +1,6 @@
 # testresult: debug_logging.py
 
-対象スクリプト: `.github/hooks/scripts/debug_logging.py`
+対象スクリプト: `.github/hooks/scripts/shared/debug_logging.py`
 実行日: 2026-05-05
 コミットID: 32ed3c0
 実行コマンド: `python -m unittest test_debug_logging -v`

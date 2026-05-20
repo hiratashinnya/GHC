@@ -15,8 +15,8 @@ You are editing `.github/hooks/config/access-control.json` — the PreToolUse ho
 | File | Role |
 |------|------|
 | `.github/hooks/config/access-control.json` | Rule definitions (edit target) |
-| `.github/hooks/scripts/ac_rule_engine.py` | Matching engine (read to understand behavior) |
-| `.github/hooks/scripts/ac_config_loader.py` | Config loader (read to check supported schema) |
+| `.github/hooks/scripts/access_control/ac_rule_engine.py` | Matching engine (read to understand behavior) |
+| `.github/hooks/scripts/access_control/ac_config_loader.py` | Config loader (read to check supported schema) |
 | `TestHooks/access_control/testcase.md` | Test case spec (update BEFORE editing JSON) |
 | `TestHooks/access_control/test_access_control.py` | Unit tests (update after testcase.md) |
 | `TestHooks/access_control/testresult.md` | Test run record (update after test execution) |

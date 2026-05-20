@@ -1,6 +1,6 @@
 # testcase: tool_input.py
 
-対象スクリプト: `.github/hooks/scripts/tool_input.py`
+対象スクリプト: `.github/hooks/scripts/tooling/tool_input.py`
 
 ---
 
