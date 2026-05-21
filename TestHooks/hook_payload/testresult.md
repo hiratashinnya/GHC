@@ -19,6 +19,9 @@
 - 期待値: 各メソッド（`warn`/`deny`/`ask`/`stop_session`/`update_input`/`add_context` など）が stdout に JSON を出力し、`EXIT_OK` を返す。
 - 実際値: `emit_output()` 呼び出し時に `AttributeError` が送出され、23テストが ERROR になった。
 - 原因: テスト環境の `sys.stdout` が `StringIO` のため `.buffer` 属性を持たない。
+- 対処理由（意思決定）: 今回PRでは実装改修を行わず、再現した失敗を testresult に正確に記録する方針を採用した。
+- 判断根拠: 本PRのスコープは entrypoint 再配置であり、`emit_output()`/stdout モック互換の改修は別件として扱うべきため。
+- 却下した案: ① `emit_output()` を即時修正して TextIO/BinaryIO 互換化する案 ② テスト側モックに `.buffer` を追加する案（いずれも本PRスコープ外として見送り）。
 - 次アクション: `emit_output()` を `TextIO`/`BinaryIO` 両対応にするか、テスト側 stdout モックを `.buffer` 対応に変更して整合を取る。
 
 ## テスト結果
