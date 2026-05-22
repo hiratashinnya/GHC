@@ -1,12 +1,25 @@
 #!/usr/bin/env python3
 """<HookName> hook: <purpose>."""
 from __future__ import annotations
+import sys
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPTS_DIR = SCRIPT_DIR.parent
+IMPORT_DIRS = (
+    SCRIPTS_DIR / "core",
+    SCRIPTS_DIR / "access_control",
+    SCRIPTS_DIR / "tooling",
+    SCRIPTS_DIR / "shared",
+)
+for import_dir in IMPORT_DIRS:
+    if str(import_dir) not in sys.path:
+        sys.path.insert(0, str(import_dir))
+
 from debug_logging import HookDebugLogger
 from hook_payload import get_hook_input, PreToolUsePayload
 from tool_input import is_write_tool, get_written_paths, is_read_tool, get_read_paths
 
-SCRIPT_DIR = Path(__file__).resolve().parent
 DEBUG = HookDebugLogger(SCRIPT_DIR, "<script_name>")
 
 

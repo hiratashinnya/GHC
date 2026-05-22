@@ -1,11 +1,11 @@
 # testresult: access_control hook
 
-対象スクリプト: `.github/hooks/scripts/access_control.py`
+対象スクリプト: `.github/hooks/scripts/entrypoints/access_control.py`
 関連モジュール: `ac_config_loader.py`, `ac_rule_engine.py`
-実行日: 2026-05-19
-コミットID: 53a9111
-実行コマンド: `c:/GHC/.venv/Scripts/python.exe TestHooks/access_control/test_access_control.py`
-総合結果: **PASS** (90/90)
+実行日: 2026-05-21
+コミットID: e4b618f
+実行コマンド: `cd TestHooks/access_control && python -m unittest test_access_control -v`
+総合結果: **FAIL** (88/90, failures=2)
 
 ---
 
@@ -57,7 +57,7 @@
 | AC-035 | TestEvaluateCommandRules | command: command_patterns 未指定 → 全マッチ | deny を返す | PASS |
 | AC-040 | TestUnknownTools | 未分類ツール `semantic_search` → allow | `None` | PASS |
 | AC-041 | TestUnknownTools | 未分類ツール `grep_search` → allow | `None` | PASS |
-| AC-050 | TestPathNormalization | Windows絶対パス → 相対化 → `docs/**` マッチ | deny を返す | PASS |
+| AC-050 | TestPathNormalization | Windows絶対パス → 相対化 → `docs/**` マッチ | `AssertionError: unexpectedly None` | FAIL |
 | AC-051 | TestPathNormalization | cwd外パス → 相対化せず → マッチしない | `None` | PASS |
 | AC-060 | TestEnabledDisable | `write_rules.enabled=False` → write ルール無効 | `None` | PASS |
 | AC-061 | TestEnabledDisable | `read_rules.enabled=False` → read ルール無効 | `None` | PASS |
@@ -98,7 +98,7 @@
 | AC-121 | TestGetCommandString | task.command + task.args を合成 | `"python -m pytest"` を返す | PASS |
 | AC-122 | TestGetCommandString | task.args 空 → コマンドのみ | `"python"` を返す | PASS |
 | AC-123 | TestGetCommandString | キーなし → 空文字 | `""` を返す | PASS |
-| AC-130 | TestEvaluateViaParser | apply_patch パスが deny ルールにマッチ | deny を返す | PASS |
+| AC-130 | TestEvaluateViaParser | apply_patch パスが deny ルールにマッチ | `AssertionError: unexpectedly None` | FAIL |
 | AC-131 | TestEvaluateViaParser | create_and_run_task コマンドが deny ルールにマッチ | deny を返す | PASS |
 | AC-132 | TestEvaluateViaParser | send_to_terminal が command ツールとして評価 | deny を返す | PASS |
 | AC-133 | TestEvaluateViaParser | grep_search includePattern は `**/.env` ルールにマッチ | deny を返す | PASS |

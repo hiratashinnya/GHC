@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-_LIB_DIR = Path(__file__).resolve().parent.parent.parent / "scripts"
+_LIB_DIR = Path(__file__).resolve().parent.parent.parent.parent / "scripts"
 if str(_LIB_DIR) not in sys.path:
     sys.path.insert(0, str(_LIB_DIR))
 

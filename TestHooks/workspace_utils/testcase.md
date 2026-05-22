@@ -1,6 +1,6 @@
 # testcase: workspace_utils.py
 
-対象スクリプト: `.github/hooks/scripts/workspace_utils.py`
+対象スクリプト: `.github/hooks/scripts/shared/workspace_utils.py`
 
 ---
 
