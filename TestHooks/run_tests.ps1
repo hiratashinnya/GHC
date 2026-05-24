@@ -6,7 +6,8 @@ $scripts = @(
     "debug_logging",
     "check_phase_gate",
     "post_tool_dashboard_sync",
-    "tool_input_spy"
+    "tool_input_spy",
+    "lifecycle_payload_logger"
 )
 
 $summary = @()
