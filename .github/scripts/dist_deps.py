@@ -12,6 +12,7 @@ from __future__ import annotations
 import ast
 import json
 import re
+import shlex
 from pathlib import Path
 from typing import List, Optional, Set
 
@@ -133,14 +134,44 @@ def _find_config_paths_from_json(hook_json_path: Path, repo_root: Path) -> List[
         hook_data = json.loads(hook_json_path.read_text(encoding="utf-8"))
         for _event, commands in hook_data.get("hooks", {}).items():
             for cmd in commands:
-                for token in cmd.get("command", "").split():
+                for token in shlex.split(cmd.get("command", "")):
                     if token.endswith(".json") and "config" in token:
                         cfg = repo_root / token.lstrip("./")
                         if cfg.exists():
                             config_paths.append(cfg)
-    except (json.JSONDecodeError, KeyError):
+    except (ValueError, json.JSONDecodeError, KeyError):
         pass
     return config_paths
+
+
+def _find_entrypoints_from_hook_json(hook_json_path: Path, repo_root: Path) -> List[Path]:
+    """フック JSON の command から実際の Python エントリーポイントを抽出する。"""
+    entrypoints: List[Path] = []
+    try:
+        hook_data = json.loads(hook_json_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return entrypoints
+
+    for commands in hook_data.get("hooks", {}).values():
+        for cmd in commands:
+            command_text = cmd.get("command", "")
+            try:
+                tokens = shlex.split(command_text)
+            except ValueError:
+                continue
+            script_token = next((token for token in tokens if token.endswith(".py")), None)
+            if script_token is None:
+                continue
+            script_path = Path(script_token)
+            candidate = (
+                script_path
+                if script_path.is_absolute()
+                else (repo_root / script_token.lstrip("./"))
+            )
+            if candidate.exists() and candidate not in entrypoints:
+                entrypoints.append(candidate)
+
+    return entrypoints
 
 
 def find_hook_target(target_name: str, repo_root: Path) -> DistTarget:
@@ -165,9 +196,13 @@ def find_hook_target(target_name: str, repo_root: Path) -> DistTarget:
             hook_json_path = candidate
             break
 
-    # エントリーポイント
-    ep = entrypoints_dir / f"{script_name}.py"
-    entrypoint_paths = [ep] if ep.exists() else list(entrypoints_dir.glob(f"*{script_name}*.py"))
+    # エントリーポイント（hook JSON の command から優先抽出）
+    entrypoint_paths: List[Path] = []
+    if hook_json_path:
+        entrypoint_paths = _find_entrypoints_from_hook_json(hook_json_path, repo_root)
+    if not entrypoint_paths:
+        ep = entrypoints_dir / f"{script_name}.py"
+        entrypoint_paths = [ep] if ep.exists() else list(entrypoints_dir.glob(f"*{script_name}*.py"))
 
     # 依存ファイル
     search_dirs = _build_search_dirs(scripts_root, repo_root)
@@ -188,8 +223,87 @@ def find_hook_target(target_name: str, repo_root: Path) -> DistTarget:
 
     return DistTarget(
         name=target_name,
+        target_type="hook",
         hook_json_path=hook_json_path,
         entrypoint_paths=entrypoint_paths,
         dependency_paths=dependency_paths,
         config_paths=config_paths,
+    )
+
+
+def _find_markdown_local_paths(source_path: Path, repo_root: Path) -> List[Path]:
+    """Markdown 内のローカルリンク先パスを収集する。"""
+    result: List[Path] = []
+    text = source_path.read_text(encoding="utf-8")
+    for link in re.findall(r"\[[^\]]*\]\(([^)]+)\)", text):
+        path_text = link.strip()
+        if (
+            not path_text
+            or path_text.startswith("#")
+            or "://" in path_text
+            or path_text.startswith("mailto:")
+        ):
+            continue
+        candidate = (source_path.parent / path_text).resolve()
+        try:
+            candidate.relative_to(repo_root)
+        except ValueError:
+            continue
+        if candidate.exists() and candidate not in result:
+            result.append(candidate)
+    return result
+
+
+def find_agent_target(target_name: str, repo_root: Path) -> DistTarget:
+    """対象名からエージェントの DistTarget を構築する。"""
+    agent_path = repo_root / ".github" / "agents" / f"{target_name}.agent.md"
+    if not agent_path.exists():
+        return DistTarget(name=target_name, target_type="agent")
+
+    dependency_paths = _find_markdown_local_paths(agent_path, repo_root)
+    agent_readme = repo_root / ".github" / "agents" / f"README-{target_name}.md"
+    if agent_readme.exists() and agent_readme not in dependency_paths:
+        dependency_paths.append(agent_readme)
+
+    return DistTarget(
+        name=target_name,
+        target_type="agent",
+        entrypoint_paths=[agent_path],
+        dependency_paths=dependency_paths,
+    )
+
+
+def find_skill_target(target_name: str, repo_root: Path) -> DistTarget:
+    """対象名からスキルの DistTarget を構築する。"""
+    skill_dir = repo_root / ".github" / "skills" / target_name
+    skill_md = skill_dir / "SKILL.md"
+    if not skill_md.exists():
+        return DistTarget(name=target_name, target_type="skill")
+
+    dependency_paths = _find_markdown_local_paths(skill_md, repo_root)
+    return DistTarget(
+        name=target_name,
+        target_type="skill",
+        entrypoint_paths=[skill_dir],
+        dependency_paths=dependency_paths,
+    )
+
+
+def find_distribution_target(target_name: str, repo_root: Path) -> DistTarget:
+    """対象名から配布ターゲットを解決する（hook / agent / skill）。"""
+    hook_target = find_hook_target(target_name, repo_root)
+    if hook_target.hook_json_path is not None:
+        return hook_target
+
+    agent_target = find_agent_target(target_name, repo_root)
+    if agent_target.entrypoint_paths:
+        return agent_target
+
+    skill_target = find_skill_target(target_name, repo_root)
+    if skill_target.entrypoint_paths:
+        return skill_target
+
+    raise FileNotFoundError(
+        f"Target '{target_name}' was not found as hook(.github/hooks/*.json), "
+        "agent(.github/agents/*.agent.md), or skill(.github/skills/*/SKILL.md)."
     )

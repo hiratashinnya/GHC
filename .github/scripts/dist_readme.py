@@ -15,6 +15,50 @@ from typing import List
 from dist_models import DistTarget
 
 
+def _target_label(target_type: str) -> str:
+    """対象種別の日本語ラベルを返す。"""
+    labels = {"hook": "フック", "agent": "エージェント", "skill": "スキル"}
+    return labels.get(target_type, "カスタマイズ")
+
+
+def _target_root_hint(target_type: str, target_name: str) -> str:
+    """対象種別ごとの配置先ルートの説明を返す。"""
+    if target_type == "hook":
+        return f"`./.github/hooks/{target_name}.json` および `./.github/hooks/scripts/...`"
+    if target_type == "agent":
+        return f"`./.github/agents/{target_name}.agent.md`"
+    if target_type == "skill":
+        return f"`./.github/skills/{target_name}/`"
+    return "`./.github/` 配下の対応パス"
+
+
+def _build_debug_section(target: DistTarget, repo_root: Path) -> str:
+    """エントリーポイントベースのデバッグ有効化手順を返す。"""
+    debug_targets = []
+    for entrypoint in target.entrypoint_paths:
+        if entrypoint.is_dir() or entrypoint.suffix != ".py":
+            continue
+        flag_path = entrypoint.with_suffix(".debug")
+        log_path = entrypoint.with_suffix(".debug.log")
+        try:
+            flag_rel = flag_path.relative_to(repo_root)
+            log_rel = log_path.relative_to(repo_root)
+        except ValueError:
+            flag_rel = flag_path
+            log_rel = log_path
+        debug_targets.append(
+            f"- フラグ: `{flag_rel}` / ログ: `{log_rel}`"
+        )
+
+    if not debug_targets:
+        return "この対象には Python エントリーポイントがないため、`.debug` ファイルでの有効化手順はありません。"
+
+    return (
+        "デバッグログを有効にするには、以下の `.debug` ファイルを作成してください：\n\n"
+        + "\n".join(debug_targets)
+    )
+
+
 def _build_folder_tree(base: Path, prefix: str = "") -> List[str]:
     """ディレクトリツリーをテキスト表現のリストで返す（再帰）。
 
@@ -68,7 +112,9 @@ def generate_readme(
     """
     tree_text = "\n".join(_build_folder_tree(out_dir))
     placement_text = _build_placement_text(copied_files, out_dir)
-    script_name = target.name.replace("-", "_")
+    target_label = _target_label(target.target_type)
+    root_hint = _target_root_hint(target.target_type, target.name)
+    debug_section = _build_debug_section(target, repo_root)
 
     entrypoint_desc = "\n".join(
         f"- `{ep.relative_to(repo_root)}`" for ep in target.entrypoint_paths
@@ -81,13 +127,26 @@ def generate_readme(
         if target.hook_json_path
         else "（なし）"
     )
+    config_section_title = "フック設定ファイル" if target.target_type == "hook" else "設定ファイル"
+    activation_title = "フック設定の有効化" if target.target_type == "hook" else "カスタマイズ設定の有効化"
+    activation_body = (
+        "GitHub Copilot の Hooks 設定でこのパッケージの JSON 設定ファイルを参照してください。"
+        if target.target_type == "hook"
+        else "GitHub Copilot の設定で、配布したエージェント/スキルが認識されることを確認してください。"
+    )
+    verification_body = (
+        "フックが正しく動作しているかを確認するには、VS Code の\n"
+        "`View > Output > GitHub Copilot Chat (Hooks)` を開き、ログを確認してください。"
+        if target.target_type == "hook"
+        else "対象のエージェント/スキルを呼び出し、期待どおりに起動・参照されることを確認してください。"
+    )
 
     content = f"""# {target.name} — 配布パッケージ
 
 ## 概要
 
-このパッケージは **{target.name}** フックの配布用ファイル一式です。  
-テスト関連ファイルは除去済みです。本番環境への配置に適した状態になっています。
+このパッケージは **{target.name}**（{target_label}）の配布用ファイル一式です。  
+テスト関連ファイルの除去は運用ポリシーに応じて実施してください（このスクリプトでは自動除去しません）。
 
 ---
 
@@ -106,17 +165,10 @@ def generate_readme(
 
 ```
 <your-repo>/
-  .github/
-    hooks/
-      {target.name}.json          ← フック設定ファイル
-      config/                     ← 設定ファイル（存在する場合）
-      scripts/
-        entrypoints/              ← エントリーポイント Python スクリプト
-        core/                     ← コアモジュール
-        shared/                   ← 共有ユーティリティ
-        access_control/           ← アクセス制御モジュール（使用する場合）
-        tooling/                  ← ツール入力解析モジュール（使用する場合）
+  ...（配布物内の相対パスを維持して配置）
 ```
+
+主な配置先: {root_hint}
 
 ---
 
@@ -134,7 +186,7 @@ def generate_readme(
 ### 依存ファイル
 {dep_desc}
 
-### フック設定ファイル
+### {config_section_title}
 {hook_json_info}
 
 ---
@@ -155,35 +207,25 @@ def generate_readme(
 bash deploy.sh <対象リポジトリのパス>
 ```
 
-### 2. フック設定の有効化
+### 2. {activation_title}
 
-GitHub Copilot の Hooks 設定でこのパッケージの JSON 設定ファイルを参照してください。
+{activation_body}
 
 ### 3. 動作確認
 
-フックが正しく動作しているかを確認するには、VS Code の
-`View > Output > GitHub Copilot Chat (Hooks)` を開き、ログを確認してください。
+{verification_body}
 
 ---
 
 ## デバッグ
 
-デバッグログを有効にするには、エントリーポイントと同じディレクトリに
-`.debug` ファイルを作成します：
-
-```powershell
-# Windows
-New-Item -ItemType File ".github/hooks/scripts/entrypoints/{script_name}.debug"
-```
-
-ログは `.github/hooks/scripts/entrypoints/{script_name}.debug.log` に出力されます。
+{debug_section}
 
 ---
 
 ## 注意事項
 
-- このパッケージはテスト関連ファイルを含みません
-- テストが必要な場合は、元のリポジトリを参照してください
+- テスト関連ファイルを含めるかどうかは配布ポリシーに合わせて判断してください
 - Python 標準ライブラリのみを使用しています（追加インストール不要）
 """
 

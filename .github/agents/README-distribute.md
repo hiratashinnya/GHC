@@ -14,6 +14,7 @@
 
 | 機能 | 説明 |
 |------|------|
+| 対象種別の自動判定 | 指定名を hook / agent / skill として解決する |
 | 依存関係の解析 | Python の import 文を再帰的に追跡し、必要なモジュールをすべて収集する |
 | ファイルコピー | `dist/<name>/` 以下に元のパス構成を維持してコピーする |
 | テスト除去 | テスト関連ファイル（`test_*.py`, `testresult.md` 等）を配布物から自動除外する |
@@ -41,9 +42,19 @@
 
 ---
 
+## 対応方針（比較結果）
+
+| 方策 | 内容 | 判断 |
+|------|------|------|
+| A | `distribute.py` を拡張して hook/agent/skill を一括処理 | ✅ 採用 |
+| B | 対象種別ごとに別スクリプト化 | ❌ 非採用 |
+| C | フックのみ自動化し他は手動 | ❌ 非採用 |
+
+---
+
 ## 配布物の構成
 
-生成される配布パッケージのディレクトリ構成：
+生成される配布パッケージは、対象種別に応じた `.github/` 配下を含みます（元の相対パスを維持）：
 
 ```
 dist/
@@ -52,37 +63,22 @@ dist/
     deploy.ps1             ← 再配置スクリプト（PowerShell / Windows）
     deploy.sh              ← 再配置スクリプト（Bash / Linux・macOS）
     .github/
-      hooks/
-        <name>.json        ← フック設定ファイル
-        config/            ← 専用設定ファイル（存在する場合）
-        scripts/
-          entrypoints/     ← エントリーポイント
-          core/            ← コアモジュール
-          shared/          ← 共有ユーティリティ
-          tooling/         ← ツール入力解析
-          access_control/  ← アクセス制御モジュール
+      hooks/ ...           ← フック対象時
+      agents/ ...          ← エージェント対象時
+      skills/ ...          ← スキル対象時
 ```
 
 ---
 
 ## 配置先のフォルダ構成
 
-配布パッケージを対象リポジトリに展開した場合の構成：
+配布パッケージを対象リポジトリに展開した場合は、`dist/<name>/.github/...` が
+そのまま `<your-repo>/.github/...` に反映されます。
 
 ```
 <your-repo>/
   .github/
-    hooks/
-      <name>.json          ← フック設定
-      config/
-        <name>.json        ← 専用設定（存在する場合）
-      scripts/
-        entrypoints/
-          <name>.py        ← エントリーポイントスクリプト
-        core/              ← 共有コアモジュール
-        shared/            ← デバッグログ等
-        tooling/           ← ツール入力解析
-        access_control/    ← アクセス制御（必要な場合）
+    ...（対象の相対パスがそのまま配置される）
 ```
 
 ---

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 from dist_models import DistTarget
 

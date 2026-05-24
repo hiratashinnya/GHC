@@ -32,6 +32,7 @@ class DistTarget:
     """配布対象の情報を保持するデータクラス。"""
 
     name: str
+    target_type: str = "hook"
     hook_json_path: Optional[Path] = None
     entrypoint_paths: List[Path] = field(default_factory=list)
     dependency_paths: List[Path] = field(default_factory=list)

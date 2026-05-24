@@ -66,7 +66,7 @@ if (Test-Path $GithubSource) {{
 }}
 
 Write-Host ""
-Write-Host "✅ デプロイ完了。{target_name} フックが $TargetRoot に配置されました。"
+Write-Host "✅ デプロイ完了。{target_name} の配布ファイルが $TargetRoot に配置されました。"
 Write-Host ""
 Write-Host "次のステップ:"
 Write-Host "  1. VS Code でリポジトリを開く"
@@ -121,7 +121,7 @@ if [ -d "$GITHUB_SOURCE" ]; then
 fi
 
 echo ""
-echo "✅ デプロイ完了。{target_name} フックが $TARGET_ROOT に配置されました。"
+echo "✅ デプロイ完了。{target_name} の配布ファイルが $TARGET_ROOT に配置されました。"
 echo ""
 echo "次のステップ:"
 echo "  1. VS Code でリポジトリを開く"

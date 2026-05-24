@@ -40,6 +40,14 @@ tools: [read, edit, run_in_terminal]
 
 ### ステップ2: 依存関係の調査
 
+対応範囲拡張の方策は以下を比較し、**単一スクリプト拡張（A案）** を採用する：
+
+| 案 | 内容 | 判断 |
+|---|---|---|
+| A | `distribute.py` を hook/agent/skill 自動判定対応に拡張 | ✅ 採用（/distribute の操作を一本化できる） |
+| B | 対象種別ごとに別スクリプトを追加 | ❌ 非採用（運用と保守が分散する） |
+| C | スクリプトは hook のみ、エージェントが手動補完 | ❌ 非採用（再現性が下がる） |
+
 `distribute.py` を実行して依存ファイルを自動解析する：
 
 ```bash
@@ -47,12 +55,13 @@ python .github/scripts/distribute.py <target> [--out-dir dist] [--repo-root .]
 ```
 
 スクリプトは以下を自動処理する：
+- 対象種別の解決（hook / agent / skill）
 - 依存ファイルの解析（import グラフの追跡）
 - ファイルのコピー（テスト判定なし — 次のステップでこのエージェントが行う）
 - 日本語 README の生成（フォルダ構成・配置手順を含む）
 - PowerShell / Bash デプロイスクリプトの生成
 
-スクリプト実行後、出力された「コピー: N 件」を確認する。
+スクリプト実行後、JSON 出力の `copiedCount` を確認する。
 解析が不十分な場合は手動で以下を確認する：
 - **フック**: `.github/hooks/<name>.json` → エントリーポイント → import チェーン → config
 - **エージェント**: `.github/agents/<name>.agent.md` → 参照スキル・プロンプト
