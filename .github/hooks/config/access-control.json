@@ -2,6 +2,29 @@
   "description": "PreToolUse アクセス制御ルール設定。ファイル書き込み/読み込みのパス制限とコマンド実行防止を行う。",
   "version": "1.0",
   "enabled": true,
+  "whitelist": {
+    "enabled": false,
+    "match_enabled": true,
+    "arbitration": "blacklist",
+    "write_rules": {
+      "enabled": true,
+      "match_enabled": true,
+      "arbitration": "blacklist",
+      "rules": []
+    },
+    "read_rules": {
+      "enabled": true,
+      "match_enabled": true,
+      "arbitration": "blacklist",
+      "rules": []
+    },
+    "command_rules": {
+      "enabled": true,
+      "match_enabled": true,
+      "arbitration": "blacklist",
+      "rules": []
+    }
+  },
 
   "write_rules": {
     "enabled": true,

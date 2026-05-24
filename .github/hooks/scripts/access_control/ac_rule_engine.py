@@ -35,12 +35,12 @@
 from __future__ import annotations
 
 import fnmatch
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum, auto
 from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional
 
-from ac_config_loader import AccessControlConfig, Rule
+from ac_config_loader import AccessControlConfig, Rule, WhitelistRule, VALID_ARBITRATIONS
 import re
 from debug_logging import HookDebugLogger
 from tool_input_parser import (
@@ -85,6 +85,7 @@ COMMAND_TOOLS: frozenset = frozenset({
 
 # deny > confirm（priority リストの先頭が最優先）
 _ACTION_PRIORITY: List[str] = ["deny", "confirm"]
+_ARBITRATION_PRIORITY: List[str] = ["blacklist", "confirm", "whitelist"]
 
 
 class OperationType(Enum):
@@ -374,6 +375,21 @@ def _matches_rule(
     return None
 
 
+def _matches_whitelist_rule(
+    rule: WhitelistRule,
+    context: MatchContext,
+    operation_type: OperationType,
+    debug: Optional[HookDebugLogger] = None,
+) -> Optional[RuleMatch]:
+    black_rule = Rule(
+        rule_id=rule.rule_id,
+        description=rule.description,
+        action="confirm",
+        when=rule.when,
+    )
+    return _matches_rule(black_rule, context, operation_type, debug=debug)
+
+
 # ---------------------------------------------------------------------------
 # Operation type resolution
 # ---------------------------------------------------------------------------
@@ -393,6 +409,47 @@ def _get_candidate_rules(config: AccessControlConfig, operation_type: OperationT
     """操作タイプに対応するグループが有効な場合そのルールリストを、無効な場合空リストを返す。"""
     group = config.get_group(operation_type.value)
     return group.rules if group.enabled else []
+
+
+def _select_whitelist_arbitration(
+    config: AccessControlConfig, operation_type: OperationType, context: MatchContext, debug: Optional[HookDebugLogger] = None
+) -> Optional[str]:
+    whitelist = config.whitelist
+    if not whitelist.enabled or not whitelist.match_enabled:
+        return None
+
+    group = whitelist.get_group(operation_type.value)
+    if not group.enabled or not group.match_enabled:
+        return None
+
+    matched_arbitrations: List[str] = []
+    for rule in group.rules:
+        if not rule.is_active():
+            continue
+        match = _matches_whitelist_rule(rule, context, operation_type, debug=debug)
+        if match:
+            arbitration = rule.arbitration
+            if arbitration in VALID_ARBITRATIONS:
+                matched_arbitrations.append(arbitration)
+
+    for arbitration in _ARBITRATION_PRIORITY:
+        if arbitration in matched_arbitrations:
+            return arbitration
+
+    return None
+
+
+def _apply_arbitration(black_match: RuleMatch, arbitration: str) -> Optional[RuleMatch]:
+    if arbitration == "blacklist":
+        return black_match
+    if arbitration == "confirm":
+        return RuleMatch(
+            rule=replace(black_match.rule, action="confirm"),
+            matched_values=black_match.matched_values,
+        )
+    if arbitration == "whitelist":
+        return None
+    return black_match
 
 
 # ---------------------------------------------------------------------------
@@ -441,6 +498,14 @@ def evaluate(config: AccessControlConfig, context: MatchContext, debug: Optional
     for action in _ACTION_PRIORITY:
         for match in active_matches:
             if match.rule.action == action:
-                return match
+                arbitration = _select_whitelist_arbitration(
+                    config=config,
+                    operation_type=operation_type,
+                    context=context,
+                    debug=debug,
+                )
+                if arbitration is None:
+                    return match
+                return _apply_arbitration(match, arbitration)
 
     return None

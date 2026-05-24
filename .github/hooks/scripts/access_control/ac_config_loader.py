@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import List
 
 VALID_ACTIONS: frozenset = frozenset({"deny", "confirm", "disabled"})
+VALID_ARBITRATIONS: frozenset = frozenset({"blacklist", "confirm", "whitelist"})
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +76,51 @@ class RuleGroup:
 
 
 @dataclass
+class WhitelistRule:
+    """ホワイトリストの単一設定項目。"""
+
+    rule_id: str = ""
+    description: str = ""
+    enabled: bool = True
+    match_enabled: bool = True
+    arbitration: str = "blacklist"
+    when: WhenClause = field(default_factory=WhenClause)
+
+    def is_active(self) -> bool:
+        return self.enabled and self.match_enabled
+
+
+@dataclass
+class WhitelistRuleGroup:
+    """操作タイプごとのホワイトリスト設定。"""
+
+    enabled: bool = True
+    match_enabled: bool = True
+    arbitration: str = "blacklist"
+    rules: List[WhitelistRule] = field(default_factory=list)
+
+
+@dataclass
+class WhitelistConfig:
+    """ホワイトリスト機能全体の設定。"""
+
+    enabled: bool = False
+    match_enabled: bool = True
+    arbitration: str = "blacklist"
+    write_rules: WhitelistRuleGroup = field(default_factory=WhitelistRuleGroup)
+    read_rules: WhitelistRuleGroup = field(default_factory=WhitelistRuleGroup)
+    command_rules: WhitelistRuleGroup = field(default_factory=WhitelistRuleGroup)
+
+    def get_group(self, operation_type: str) -> WhitelistRuleGroup:
+        mapping = {
+            "write": self.write_rules,
+            "read": self.read_rules,
+            "command": self.command_rules,
+        }
+        return mapping.get(operation_type, WhitelistRuleGroup())
+
+
+@dataclass
 class AccessControlConfig:
     """アクセス制御設定全体。
 
@@ -92,6 +138,7 @@ class AccessControlConfig:
     write_rules: RuleGroup = field(default_factory=RuleGroup)
     read_rules: RuleGroup = field(default_factory=RuleGroup)
     command_rules: RuleGroup = field(default_factory=RuleGroup)
+    whitelist: WhitelistConfig = field(default_factory=WhitelistConfig)
     skipped_rules: List[str] = field(default_factory=list)
 
     def get_group(self, operation_type: str) -> "RuleGroup":
@@ -114,6 +161,20 @@ def _parse_when(raw_when: dict) -> WhenClause:
         command_patterns=list(raw_when.get("command_patterns") or []),
         scope_patterns=list(raw_when.get("scope_patterns") or []),
     )
+
+
+def _to_bool(raw: object, default: bool) -> bool:
+    return raw if isinstance(raw, bool) else default
+
+
+def _parse_arbitration(raw: object, default: str, errors: List[str], context: str) -> str:
+    value = raw if isinstance(raw, str) else default
+    if value not in VALID_ARBITRATIONS:
+        errors.append(
+            f"{context}: 不正な arbitration {value!r}。有効な値: {sorted(VALID_ARBITRATIONS)}"
+        )
+        return default
+    return value
 
 
 def _parse_rule(raw: dict) -> Rule:
@@ -171,6 +232,83 @@ def _parse_rule_group(raw_group: object, errors: List[str]) -> RuleGroup:
     return RuleGroup()
 
 
+def _parse_whitelist_rule(raw: dict, errors: List[str], default_arbitration: str) -> WhitelistRule:
+    rule_id = raw.get("id", "")
+    arbitration = _parse_arbitration(
+        raw.get("arbitration"),
+        default_arbitration,
+        errors,
+        f"whitelist rule {rule_id or '(unknown)'}",
+    )
+    return WhitelistRule(
+        rule_id=rule_id,
+        description=raw.get("description", ""),
+        enabled=_to_bool(raw.get("enabled", True), True),
+        match_enabled=_to_bool(raw.get("match_enabled", True), True),
+        arbitration=arbitration,
+        when=_parse_when(raw.get("when") or {}),
+    )
+
+
+def _parse_whitelist_rule_list(
+    raw_list: object, errors: List[str], default_arbitration: str
+) -> List[WhitelistRule]:
+    if not isinstance(raw_list, list):
+        return []
+    rules: List[WhitelistRule] = []
+    for item in raw_list:
+        if not isinstance(item, dict):
+            continue
+        rules.append(_parse_whitelist_rule(item, errors, default_arbitration))
+    return rules
+
+
+def _parse_whitelist_group(
+    raw_group: object, errors: List[str], default_arbitration: str
+) -> WhitelistRuleGroup:
+    if isinstance(raw_group, list):
+        return WhitelistRuleGroup(
+            enabled=True,
+            match_enabled=True,
+            arbitration=default_arbitration,
+            rules=_parse_whitelist_rule_list(raw_group, errors, default_arbitration),
+        )
+    if isinstance(raw_group, dict):
+        group_arbitration = _parse_arbitration(
+            raw_group.get("arbitration"),
+            default_arbitration,
+            errors,
+            "whitelist group",
+        )
+        return WhitelistRuleGroup(
+            enabled=_to_bool(raw_group.get("enabled", True), True),
+            match_enabled=_to_bool(raw_group.get("match_enabled", True), True),
+            arbitration=group_arbitration,
+            rules=_parse_whitelist_rule_list(raw_group.get("rules") or [], errors, group_arbitration),
+        )
+    return WhitelistRuleGroup(arbitration=default_arbitration)
+
+
+def _parse_whitelist(raw_whitelist: object, errors: List[str]) -> WhitelistConfig:
+    if not isinstance(raw_whitelist, dict):
+        return WhitelistConfig()
+
+    global_arbitration = _parse_arbitration(
+        raw_whitelist.get("arbitration"),
+        "blacklist",
+        errors,
+        "whitelist",
+    )
+    return WhitelistConfig(
+        enabled=_to_bool(raw_whitelist.get("enabled", False), False),
+        match_enabled=_to_bool(raw_whitelist.get("match_enabled", True), True),
+        arbitration=global_arbitration,
+        write_rules=_parse_whitelist_group(raw_whitelist.get("write_rules"), errors, global_arbitration),
+        read_rules=_parse_whitelist_group(raw_whitelist.get("read_rules"), errors, global_arbitration),
+        command_rules=_parse_whitelist_group(raw_whitelist.get("command_rules"), errors, global_arbitration),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -196,5 +334,6 @@ def load_config(config_path: Path) -> AccessControlConfig:
         write_rules=_parse_rule_group(raw.get("write_rules"), skipped),
         read_rules=_parse_rule_group(raw.get("read_rules"), skipped),
         command_rules=_parse_rule_group(raw.get("command_rules"), skipped),
+        whitelist=_parse_whitelist(raw.get("whitelist"), skipped),
         skipped_rules=skipped,
     )
