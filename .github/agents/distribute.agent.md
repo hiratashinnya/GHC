@@ -10,8 +10,23 @@ tools: [read, edit, run_in_terminal]
 ## 役割の制約
 
 - DO NOT 元のファイルを削除・上書きする（読み取りと dist/ への書き込みのみ許可）
-- DO NOT テスト関連ファイルを配布物に含める（ただしテスト機能そのものを配布する場合は例外）
 - ONLY `dist/<name>/` 配下への書き込みを行う（元ファイルのREADMEアップデートを除く）
+- テスト関連ファイルの判定・除去は **このエージェント自身の責務**（スクリプトに委譲しない）
+
+## テスト関連コンテンツの判定基準
+
+配布物から除外するもの（原本はそのまま保持する）：
+
+| 対象 | 例 |
+|------|----|
+| テストスクリプトファイル | `test_*.py`, `*_test.py` |
+| テスト結果・仕様ファイル | `testresult.md`, `testcase.md` |
+| テスト実行スクリプト | `run_tests.ps1` |
+| テストディレクトリ配下のファイル | `TestHooks/`, `tests/`, `test/` |
+| Markdown のテスト関連セクション | `## テスト作業`, `## テストの実施`, `## Test`, `## テスト` 等の見出し以下 |
+
+**例外**: テスト機能そのものを配布したい場合（例: テストユーティリティフック）は、
+ユーザーへの確認を経てこれらを含めることができる。
 
 ## 作業手順
 
@@ -25,35 +40,32 @@ tools: [read, edit, run_in_terminal]
 
 ### ステップ2: 依存関係の調査
 
-`distribute.py` を使用して依存ファイルを自動解析するか、手動で以下を確認する：
-
-- **フック対象の場合**:
-  1. `.github/hooks/<name>.json` — フック設定（どのスクリプトを呼ぶか）
-  2. `.github/hooks/scripts/entrypoints/<name>.py` — エントリーポイント
-  3. import 文から依存モジュールを追跡（`core/`, `shared/`, `tooling/`, `access_control/`）
-  4. `.github/hooks/config/<name>.json` — 専用設定ファイル（存在する場合）
-
-- **エージェント対象の場合**:
-  1. `.github/agents/<name>.agent.md` — エージェント定義
-  2. 参照されているスキル・プロンプトを特定する
-
-- **スキル対象の場合**:
-  1. `.github/skills/<name>/SKILL.md` — スキル定義
-  2. 参照されているスクリプト・プロンプトを特定する
-
-### ステップ3: 配布パッケージの生成
-
-`distribute.py` を実行して配布物を生成する：
+`distribute.py` を実行して依存ファイルを自動解析する：
 
 ```bash
 python .github/scripts/distribute.py <target> [--out-dir dist] [--repo-root .]
 ```
 
-スクリプトが以下を自動処理する：
-- ファイルのコピー（テスト関連ファイルは自動除外）
-- Markdown のテスト関連セクションの除去
+スクリプトは以下を自動処理する：
+- 依存ファイルの解析（import グラフの追跡）
+- ファイルのコピー（テスト判定なし — 次のステップでこのエージェントが行う）
 - 日本語 README の生成（フォルダ構成・配置手順を含む）
 - PowerShell / Bash デプロイスクリプトの生成
+
+スクリプト実行後、出力された「コピー: N 件」を確認する。
+解析が不十分な場合は手動で以下を確認する：
+- **フック**: `.github/hooks/<name>.json` → エントリーポイント → import チェーン → config
+- **エージェント**: `.github/agents/<name>.agent.md` → 参照スキル・プロンプト
+- **スキル**: `.github/skills/<name>/SKILL.md` → 参照スクリプト・プロンプト
+
+### ステップ3: テスト関連コンテンツの除去
+
+スクリプトがコピーした全ファイルを確認し、テスト関連コンテンツを **このエージェント自身が** 削除する：
+
+1. `dist/<name>/` 以下を一覧する
+2. テストファイル（`test_*.py`, `testresult.md` 等）を `dist/<name>/` から削除する
+3. Markdown ファイル（`README.md` 等）を開き、テスト関連セクションの見出し以下を除去して上書き保存する
+4. 原本ファイル（`.github/` 以下）は **一切変更しない**
 
 ### ステップ4: README の内容検証・更新
 
@@ -75,7 +87,7 @@ python .github/scripts/distribute.py <target> [--out-dir dist] [--repo-root .]
 
 1. 元の README ファイルを確認する（例: `.github/agents/README-<name>.md`）
 2. 配布パッケージで更新した情報を元 README にも反映する
-3. ただし、元 README にはテスト関連情報を残す
+3. **元 README にはテスト関連情報を残す**（削除しない）
 
 ### ステップ6: 最終確認
 
@@ -85,6 +97,7 @@ python .github/scripts/distribute.py <target> [--out-dir dist] [--repo-root .]
 - [ ] `dist/<name>/deploy.ps1` が生成されている
 - [ ] `dist/<name>/deploy.sh` が生成されている
 - [ ] テスト関連ファイルが含まれていない（`test_*.py`, `testresult.md` 等）
+- [ ] Markdown からテスト関連セクションが除去されている
 - [ ] エントリーポイントのコピーが含まれている
 - [ ] 全依存ファイルのコピーが含まれている
 - [ ] フック設定 JSON のコピーが含まれている（フックの場合）
@@ -108,6 +121,6 @@ python .github/scripts/distribute.py <target> [--out-dir dist] [--repo-root .]
 
 1. 生成された配布パッケージのパス（`dist/<name>/`）
 2. 含まれるファイルの一覧
-3. 除外されたテストファイルの一覧（あれば）
+3. 除外されたテストファイルの一覧
 4. デプロイスクリプトの使用方法
 5. 元ファイルへの README アップデート結果
