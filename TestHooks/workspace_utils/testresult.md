@@ -1,9 +1,9 @@
 # testresult: workspace_utils.py
 
-対象スクリプト: `.github/hooks/scripts/workspace_utils.py`
-実行日: 2026-05-08
-コミットID: d8db764 (未コミット変更あり: _lib 一元管理統合)
-実行コマンド: `python -m unittest TestHooks/workspace_utils/test_workspace_utils.py -v`
+対象スクリプト: `.github/hooks/scripts/shared/workspace_utils.py`
+実行日: 2026-05-20
+コミットID: 9274932
+実行コマンド: `cd TestHooks/workspace_utils && python -m unittest test_workspace_utils -v`
 総合結果: **PASS** (16/16)
 
 ---

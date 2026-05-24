@@ -3,7 +3,7 @@
     "PreToolUse": [
       {
         "type": "command",
-        "command": "python .github/hooks/scripts/access_control.py",
+        "command": "python .github/hooks/scripts/entrypoints/access_control.py",
         "timeout": 10
       }
     ]

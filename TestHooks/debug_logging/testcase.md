@@ -1,6 +1,6 @@
 # testcase: debug_logging.py
 
-対象スクリプト: `.github/hooks/scripts/debug_logging.py`
+対象スクリプト: `.github/hooks/scripts/shared/debug_logging.py`
 
 ---
 

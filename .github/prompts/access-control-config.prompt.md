@@ -15,8 +15,8 @@ You are editing `.github/hooks/config/access-control.json` — the PreToolUse ho
 | File | Role |
 |------|------|
 | `.github/hooks/config/access-control.json` | Rule definitions (edit target) |
-| `.github/hooks/scripts/ac_rule_engine.py` | Matching engine (read to understand behavior) |
-| `.github/hooks/scripts/ac_config_loader.py` | Config loader (read to check supported schema) |
+| `.github/hooks/scripts/access_control/ac_rule_engine.py` | Matching engine (read to understand behavior) |
+| `.github/hooks/scripts/access_control/ac_config_loader.py` | Config loader (read to check supported schema) |
 | `TestHooks/access_control/testcase.md` | Test case spec (update BEFORE editing JSON) |
 | `TestHooks/access_control/test_access_control.py` | Unit tests (update after testcase.md) |
 | `TestHooks/access_control/testresult.md` | Test run record (update after test execution) |
@@ -98,3 +98,15 @@ Check for:
 3. Commit all changed files.
 4. Run: `python -m unittest discover -s TestHooks/access_control -p "test_access_control.py" -v`
 5. Record result in `testresult.md` with `実行日:` and `コミットID:` (from `git log --oneline -1`).
+
+### Failure Recording Policy (mandatory)
+
+- Do not conceal failed tests. Record actual outcome as-is in `testresult.md`.
+- If any test fails, add both sections below:
+  1. 備考付きサマリ (note rows for each failed test ID)
+  2. 失敗詳細 (期待値 / 実際値 / 原因 / 次アクション)
+- When a failure is addressed later, extend the failure detail with:
+  - 対処理由（意思決定）
+  - 判断根拠（why selected）
+  - 却下した案（rejected options and why）
+- Never change testcase/test assertion only to make the current result look green without explicit policy decision.

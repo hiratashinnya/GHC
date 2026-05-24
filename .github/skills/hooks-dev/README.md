@@ -39,11 +39,11 @@ VS Code 向け GitHub Copilot エージェントフックの開発・デバッ�
 | [`hooks-docs/payload-PreCompact.md`](../hooks-docs/payload-PreCompact.md) | 圧縮前の状態保存 |
 | [`hooks-docs/tool-input-schema.md`](../hooks-docs/tool-input-schema.md) | 全ツールの tool_input スキーマ・読み書き分類表 |
 | [`hooks-docs/hook-template.md`](../hooks-docs/hook-template.md) | チェックリスト・Python テンプレート・ブロックパターン集 |
-| [`hooks/scripts/hook_payload.py`](../hooks/scripts/hook_payload.py) | facade: `get_hook_input()` / `get_hook_input_as()` / 互換 re-export |
-| [`hooks/scripts/hook_input.py`](../hooks/scripts/hook_input.py) | `read_payload()` / `get_hook_input()` / `get_hook_input_as()` |
-| [`hooks/scripts/hook_event.py`](../hooks/scripts/hook_event.py) | 全 8 イベント分型データクラス / `parse_payload()` |
-| [`hooks/scripts/hook_output.py`](../hooks/scripts/hook_output.py) | 出力 alias 付与 / `emit_output()` / `EXIT_OK` / `EXIT_BLOCK` |
-| [`hooks/scripts/tool_input.py`](../hooks/scripts/tool_input.py) | `is_write_tool()` / `is_read_tool()` / `get_written_paths()` / `get_read_paths()` |
+| [`hooks/scripts/core/hook_payload.py`](../hooks/scripts/core/hook_payload.py) | facade: `get_hook_input()` / `get_hook_input_as()` / 互換 re-export |
+| [`hooks/scripts/core/hook_input.py`](../hooks/scripts/core/hook_input.py) | `read_payload()` / `get_hook_input()` / `get_hook_input_as()` |
+| [`hooks/scripts/core/hook_event.py`](../hooks/scripts/core/hook_event.py) | 全 8 イベント分型データクラス / `parse_payload()` |
+| [`hooks/scripts/core/hook_output.py`](../hooks/scripts/core/hook_output.py) | 出力 alias 付与 / `emit_output()` / `EXIT_OK` / `EXIT_BLOCK` |
+| [`hooks/scripts/tooling/tool_input.py`](../hooks/scripts/tooling/tool_input.py) | `is_write_tool()` / `is_read_tool()` / `get_written_paths()` / `get_read_paths()` |
 
 ---
 

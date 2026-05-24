@@ -8,8 +8,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPTS_DIR = Path(r"c:\GHC\.github\hooks\scripts")
-sys.path.insert(0, str(SCRIPTS_DIR))
+LOCAL_SCRIPTS_DIR = Path(__file__).resolve().parents[2] / ".github" / "hooks" / "scripts"
+SCRIPTS_DIR = LOCAL_SCRIPTS_DIR if LOCAL_SCRIPTS_DIR.is_dir() else Path(r"c:\GHC\.github\hooks\scripts")
+for relative in ("core", "access_control", "tooling", "shared", "entrypoints"):
+    sys.path.insert(0, str(SCRIPTS_DIR / relative))
 
 from workspace_utils import to_workspace_relative, is_under_dir, dedup_paths
 from _lib._io import norm

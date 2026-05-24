@@ -1,6 +1,6 @@
 # testcase: check_phase_gate.py
 
-対象スクリプト: `.github/hooks/scripts/check_phase_gate.py`
+対象スクリプト: `.github/hooks/scripts/entrypoints/check_phase_gate.py`
 
 ---
 

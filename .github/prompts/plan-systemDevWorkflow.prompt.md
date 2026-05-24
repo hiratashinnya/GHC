@@ -64,7 +64,7 @@ Iteration 3: フェーズ2 → 6（追加機能セット B）
 
 ## フェーズゲート強制（フック）
 
-> **実装状況**: ✅ 実装済み — オーケストレータのフェーズゲートチェック（ソフト強制）は完了。`PreToolUse` フックによる機械的ブロックも実装済み（`.github/hooks/scripts/check_phase_gate.py` + `.github/hooks/phase-gate.json`）
+> **実装状況**: ✅ 実装済み — オーケストレータのフェーズゲートチェック（ソフト強制）は完了。`PreToolUse` フックによる機械的ブロックも実装済み（`.github/hooks/scripts/entrypoints/check_phase_gate.py` + `.github/hooks/phase-gate.json`）
 
 
 フェーズ・プロセスのゲートは **`PreToolUse` フックで機械的にブロック**する。
@@ -390,7 +390,7 @@ docs/detailed-design/
 
 ## ダッシュボード
 
-> **実装状況**: ✅ 実装済み — ダッシュボードテンプレート（`.github/templates/dashboard.md`）・実体ファイル（`docs/dashboard.md`）作成済み。`PostToolUse` フックによる自動更新も実装済み（`.github/hooks/scripts/post_tool_dashboard_sync.py` + `.github/hooks/dashboard-sync.json`）
+> **実装状況**: ✅ 実装済み — ダッシュボードテンプレート（`.github/templates/dashboard.md`）・実体ファイル（`docs/dashboard.md`）作成済み。`PostToolUse` フックによる自動更新も実装済み（`.github/hooks/scripts/entrypoints/post_tool_dashboard_sync.py` + `.github/hooks/dashboard-sync.json`）
 
 `docs/dashboard.md` はプロジェクト全体の進捗とボトルネックを可視化する。
 

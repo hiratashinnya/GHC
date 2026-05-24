@@ -1,6 +1,6 @@
 # testcase: access_control hook
 
-対象スクリプト: `.github/hooks/scripts/access_control.py`
+対象スクリプト: `.github/hooks/scripts/entrypoints/access_control.py`
 関連モジュール: `ac_config_loader.py`, `ac_rule_engine.py`
 設定ファイル: `.github/hooks/config/access-control.json`
 
@@ -135,3 +135,64 @@
 | AC-094 | 無効な regex パターンが debug ログに記録される | `["\\bdd\\b", "[invalid(regex"]` | `"rm -rf"` | マッチ結果に `[invalid(regex` は含まれず（skip）、debug.log に regex error が記録される |
 | AC-095 | 複数の有効パターンor マッチ | `["\\brm\\b", "\\bdd\\b", "dev-null"]` | `"rm -rf ./dist"` | `["\\brm\\b"]` を返す（複数マッチは全て返す） |
 | AC-096 | 大小文字無視マッチ | `["\\bDD\\b"]` | `"dd if=/dev/zero"` | `["\\bDD\\b"]` を返す（IGNORECASE で小文字dd がマッチ） |
+
+### tool_input_parser.py — get_write_paths()
+
+| テストID | 観点 | tool_name | tool_input | 期待動作 |
+|----------|------|-----------|------------|----------|
+| AC-100 | apply_patch: Update File パスを抽出 | `apply_patch` | `{"input": "*** Update File: c:\\GHC\\docs\\foo.md\n@@..."}` | `["c:\\GHC\\docs\\foo.md"]` を返す |
+| AC-101 | apply_patch: Add/Delete/Update 複数行 | `apply_patch` | input に Update + Add 2行 | 両パスをリストで返す |
+| AC-102 | apply_patch: rename パッチのソースパスのみ返す | `apply_patch` | `{"input": "*** Update File: old.py -> new.py"}` | `["old.py"]` を返す（`-> new.py` は除外） |
+| AC-103 | apply_patch: input が文字列でない場合は空を返す | `apply_patch` | `{"input": 42}` | `[]` を返す |
+| AC-104 | create_directory: dirPath を返す | `create_directory` | `{"dirPath": "src/subdir"}` | `["src/subdir"]` を返す |
+| AC-105 | 非 write ツールは空を返す | `read_file` | `{"filePath": "docs/foo.md"}` | `[]` を返す |
+
+### tool_input_parser.py — get_read_paths()
+
+| テストID | 観点 | tool_name | tool_input | 期待動作 |
+|----------|------|-----------|------------|----------|
+| AC-110 | read_file: filePath を返す | `read_file` | `{"filePath": "docs/foo.md"}` | `["docs/foo.md"]` を返す |
+| AC-111 | get_errors: filePaths リストを返す | `get_errors` | `{"filePaths": ["a.py", "b.py"]}` | `["a.py", "b.py"]` を返す |
+| AC-112 | grep_search: includePattern を返す | `grep_search` | `{"includePattern": "src/**/*.py"}` | `["src/**/*.py"]` を返す |
+| AC-113 | 非 read ツールは空を返す | `apply_patch` | `{"input": "*** Update File: foo.py"}` | `[]` を返す |
+
+### tool_input_parser.py — get_command_string()
+
+| テストID | 観点 | tool_input | 期待動作 |
+|----------|------|------------|----------|
+| AC-120 | command キー直接参照 | `{"command": "git status"}` | `"git status"` を返す |
+| AC-121 | create_and_run_task: task.command + task.args を合成 | `{"task": {"command": "python", "args": ["-m", "pytest"]}}` | `"python -m pytest"` を返す |
+| AC-122 | task.args が空の場合はコマンドのみ | `{"task": {"command": "python", "args": []}}` | `"python"` を返す |
+| AC-123 | どのキーも存在しない場合は空文字 | `{}` | `""` を返す |
+
+### ac_rule_engine.py — ツール分類・評価経路確認（tool_input_parser 経由）
+
+| テストID | 観点 | tool_name | tool_input | rules | 期待動作 |
+|----------|------|-----------|------------|-------|----------|
+| AC-130 | apply_patch のパスが deny ルールにマッチ | `apply_patch` | `{"input": "*** Update File: .github/hooks/scripts/foo.py"}` | deny ルール `.github/hooks/scripts/**` | deny を返す |
+| AC-131 | create_and_run_task のコマンドが deny ルールにマッチ | `create_and_run_task` | `{"task": {"command": "rm", "args": ["-rf", "./dist"]}}` | deny ルール `\\brm\\b` | deny を返す |
+| AC-132 | send_to_terminal が command ツールとして評価される | `send_to_terminal` | `{"command": "git push origin main"}` | deny ルール `\\bgit\\b\\s+push\\b` | deny を返す |
+| AC-133 | grep_search が read ツールとして評価される | `grep_search` | `{"includePattern": ".env"}` | deny ルール `**/.env` | deny を返す（`.env` は `**/.env` にマッチ） |
+| AC-134 | workspace 外絶対パスが評価対象から漏れないこと | `create_file` | `{"filePath": "D:/other/secret.py"}` | deny ルール `D:/other/**` | deny を返す（_to_posix_relative で相対化されず、forward-slash 変換後にマッチ） |
+
+### Scope Patterns 判定（ac_rule_engine.py — read 系 scope_patterns 導入）
+
+#### WhenClause scope_patterns パース
+
+| テストID | 観点 | 入力 | 期待動作 |
+|----------|------|------|----------|
+| AC-008a | `_parse_when` scope_patterns のみ | `{"scope_patterns": ["**/.env"]}` | `WhenClause.scope_patterns` に格納される |
+| AC-008b | `_parse_when` path + scope 両方 | `{"path_patterns": ["docs/**"], "scope_patterns": ["docs/**"]}` | 両フィールドに正しく格納される |
+
+#### Scope patterns マッチング（glob 交差判定）
+
+| テストID | 観点 | tool_name | tool_input | rules (scope_patterns) | 期待動作 |
+|----------|------|-----------|------------|------------------------|----------|
+| AC-140 | scope 明確包含: request=wider, rule=narrower | `grep_search` | `{"includePattern": "**/*"}` | deny ルール `**/.env` | deny を返す（全体検索は `.env` を必ず含む） |
+| AC-141 | scope 明確包含: request=parent, rule=child | `grep_search` | `{"includePattern": ".github/**"}` | deny ルール `.github/hooks/**` | deny を返す（request が rule を包含） |
+| AC-142 | scope 不確実交差: request=wider, rule=narrower | `grep_search` | `{"includePattern": "src/**"}` | deny ルール `src/**/*.env` | confirm を返す（request が wider だが確実でない） |
+| AC-143 | scope 明確非交差 | `grep_search` | `{"includePattern": "docs/**"}` | deny ルール `**/.env`, confirm ルール `.github/**` | `None` を返す（どちらも non-overlapping） |
+| AC-144 | ambiguous_read（空 includePattern） | `grep_search` | `{"includePattern": ""}` | deny ルール `**/.env` (scope_patterns) | confirm を返す（ambiguous 既定値） |
+| AC-145 | file_search query = scope 明確包含 | `file_search` | `{"query": "**/*"}` | deny ルール `**/*.secret` | deny を返す（全体検索は `*.secret` を必ず含む） |
+| AC-146 | concrete と scope 両マッチ時の優先（concrete 側 deny） | `read_file` | `{"filePath": ".env"}` | deny ルール（path_patterns=`**/.env`, scope_patterns=`**/*.env`） | deny を返す（path_patterns で即マッチ） |
+| AC-147 | 後方互換: scope_patterns 未指定時に path_patterns を使用 | `grep_search` | `{"includePattern": ".env"}` | deny ルール、when.scope_patterns 未指定で when.path_patterns=`**/.env` | deny を返す（従来動作の互換） |

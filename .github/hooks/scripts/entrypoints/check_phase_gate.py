@@ -2,7 +2,7 @@
 """H-1: check-phase-gate - block writes when required gate docs are not approved.
 
 Usage:
-  python .github/hooks/scripts/check_phase_gate.py [--target-path <path>]
+  python .github/hooks/scripts/entrypoints/check_phase_gate.py [--target-path <path>]
 """
 
 from __future__ import annotations
@@ -15,6 +15,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPTS_DIR = SCRIPT_DIR.parent
+IMPORT_DIRS = (
+    SCRIPTS_DIR / "core",
+    SCRIPTS_DIR / "access_control",
+    SCRIPTS_DIR / "tooling",
+    SCRIPTS_DIR / "shared",
+)
+for import_dir in IMPORT_DIRS:
+    if str(import_dir) not in sys.path:
+        sys.path.insert(0, str(import_dir))
+
 from debug_logging import HookDebugLogger
 from hook_payload import get_hook_input, CommonPayload, PreToolUsePayload
 from tool_input import is_write_tool, get_written_paths
@@ -24,7 +36,6 @@ from _lib._io import norm
 # process=4 専用サフィックス。variant 抽出時に compId と区別するために除去する。
 ARTIFACT_SUBTYPES = {"api", "domain", "schema", "testcase"}
 
-SCRIPT_DIR = Path(__file__).resolve().parent
 DEBUG = HookDebugLogger(SCRIPT_DIR, "check_phase_gate")
 
 

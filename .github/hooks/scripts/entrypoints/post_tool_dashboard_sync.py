@@ -13,12 +13,23 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPTS_DIR = SCRIPT_DIR.parent
+IMPORT_DIRS = (
+    SCRIPTS_DIR / "core",
+    SCRIPTS_DIR / "access_control",
+    SCRIPTS_DIR / "tooling",
+    SCRIPTS_DIR / "shared",
+)
+for import_dir in IMPORT_DIRS:
+    if str(import_dir) not in sys.path:
+        sys.path.insert(0, str(import_dir))
+
 from debug_logging import HookDebugLogger
 from hook_payload import get_hook_input, CommonPayload, PostToolUsePayload
 from tool_input import is_write_tool, get_written_paths
 from workspace_utils import to_workspace_relative
 
-SCRIPT_DIR = Path(__file__).resolve().parent
 PATCH_TIMEOUT_SECONDS = 30
 DEBUG = HookDebugLogger(SCRIPT_DIR, "post_tool_dashboard_sync")
 
