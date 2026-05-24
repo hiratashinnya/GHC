@@ -150,4 +150,5 @@ spy | {"event": "PreToolUse",  "tool_name": "read_file",              "tool_inpu
 |---|---|---|---|
 | `hooks/dashboard-sync.json` | PostToolUse | `post_tool_dashboard_sync.py` | docs/*.md 書き込み後にダッシュボードを同期 |
 | `hooks/phase-gate.json` | PreToolUse | `check_phase_gate.py` | フェーズゲートチェック（承認確認） |
+| `hooks/lifecycle-payload-log.json` | SessionStart / Stop / SubagentStart / SubagentStop | `lifecycle_payload_logger.py` | セッション/サブエージェントの開始・終了イベント入力 JSON をデバッグログ出力 |
 | `hooks/tool-spy.json` | PreToolUse / PostToolUse | `tool_input_spy.py` | 全ツールの tool_input を調査ログに記録（調査専用） |
