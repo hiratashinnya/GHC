@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import sys
 from dataclasses import dataclass, field
-from typing import Any, Dict, Type, cast
+from typing import Any, Dict, List, Type, cast
 
 from hook_output import EXIT_BLOCK, EXIT_OK, emit_output
+from tool_input_parser import get_write_paths, get_read_paths, get_command_string
 
 
 def _get_first(data: Dict[str, Any], *keys: str, default: object = "") -> object:
@@ -115,6 +116,18 @@ class PreToolUsePayload(CommonPayload):
             hook_output["additionalContext"] = context
         emit_output({"hookSpecificOutput": hook_output})
         return EXIT_OK
+
+    def write_paths(self) -> List[str]:
+        """書き込み対象パスのリストを返す（tool_input_parser に委譲）。"""
+        return get_write_paths(self.tool_name, self.tool_input)
+
+    def read_paths(self) -> List[str]:
+        """読み取り対象パスのリストを返す（tool_input_parser に委譲）。"""
+        return get_read_paths(self.tool_name, self.tool_input)
+
+    def command_string(self) -> str:
+        """コマンド文字列を返す（tool_input_parser に委譲）。"""
+        return get_command_string(self.tool_input)
 
 
 @dataclass

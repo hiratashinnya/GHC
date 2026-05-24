@@ -33,12 +33,12 @@ Use this skill when you need to:
 | [hooks-docs/payload-PreCompact.md](../hooks-docs/payload-PreCompact.md) | Pre-compaction state save |
 | [hooks-docs/tool-input-schema.md](../hooks-docs/tool-input-schema.md) | All tool_input schemas, read/write classification table |
 | [hooks-docs/hook-template.md](../hooks-docs/hook-template.md) | Full checklist, Python template, blocking pattern examples |
-| [hooks/scripts/hook_template.py](../hooks/scripts/hook_template.py) | Python hook script template with `HookOutput` usage examples |
-| [hooks/scripts/hook_payload.py](../hooks/scripts/hook_payload.py) | facade: `get_hook_input()`, `get_hook_input_as()`, backward-compatible re-exports |
-| [hooks/scripts/hook_input.py](../hooks/scripts/hook_input.py) | stdin read, JSON parse, high-level typed input helpers |
-| [hooks/scripts/hook_event.py](../hooks/scripts/hook_event.py) | typed dataclasses for all 8 events, `parse_payload()` |
-| [hooks/scripts/hook_output.py](../hooks/scripts/hook_output.py) | output aliasing, `emit_output()`, `EXIT_OK` / `EXIT_BLOCK` |
-| [hooks/scripts/tool_input.py](../hooks/scripts/tool_input.py) | `WRITE_TOOLS`/`READ_TOOLS`, `get_written_paths()`, `get_read_paths()` |
+| [hooks/scripts/templates/hook-template.py](../hooks/scripts/templates/hook-template.py) | Python hook script template with `HookOutput` usage examples |
+| [hooks/scripts/core/hook_payload.py](../hooks/scripts/core/hook_payload.py) | facade: `get_hook_input()`, `get_hook_input_as()`, backward-compatible re-exports |
+| [hooks/scripts/core/hook_input.py](../hooks/scripts/core/hook_input.py) | stdin read, JSON parse, high-level typed input helpers |
+| [hooks/scripts/core/hook_event.py](../hooks/scripts/core/hook_event.py) | typed dataclasses for all 8 events, `parse_payload()` |
+| [hooks/scripts/core/hook_output.py](../hooks/scripts/core/hook_output.py) | output aliasing, `emit_output()`, `EXIT_OK` / `EXIT_BLOCK` |
+| [hooks/scripts/tooling/tool_input.py](../hooks/scripts/tooling/tool_input.py) | `WRITE_TOOLS`/`READ_TOOLS`, `get_written_paths()`, `get_read_paths()` |
 
 ---
 
@@ -242,5 +242,17 @@ See [hooks-test.prompt.md](../../prompts/hooks-test.prompt.md) for full command 
 |---|---|
 | `実行日:` | セッションコンテキストに表示されている **現在日付** を使用する（過去の日付やハードコード値は禁止） |
 | `コミットID:` | `git log --oneline -1` を実行して取得する |
+
+### FAIL 記録の透明性ルール
+
+- FAIL を PASS/未実行 に書き換えてはならない。実測結果をそのまま記録すること。
+- FAIL が1件でもある場合は、`testresult.md` に以下を必ず追加すること。
+  - 備考付きサマリ（失敗テストIDごとの注記）
+  - 失敗詳細（期待値 / 実際値 / 失敗理由 / 次アクション）
+- 仕様不一致が原因の失敗でも、テスト結果の改ざんで吸収せず、失敗として記録した上で方針決定を待つこと。
+- 方針決定後に対処した場合は、失敗詳細に以下を追記すること。失敗した事実を隠蔽してはならない。
+  - 対処理由（意思決定）
+  - 判断根拠（なぜその案を採用したか）
+  - 却下した案（不採用理由）
 
 > **注意**: 日付を推測・ハードコードしないこと。コンテキストに "The current date is YYYY年MM月DD日" と明示されているので、それを参照する。

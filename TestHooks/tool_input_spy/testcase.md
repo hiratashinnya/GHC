@@ -1,6 +1,6 @@
 # testcase: tool_input_spy.py
 
-対象スクリプト: `.github/hooks/scripts/tool_input_spy.py`
+対象スクリプト: `.github/hooks/scripts/entrypoints/tool_input_spy.py`
 
 ---
 

@@ -1,6 +1,6 @@
 # testcase: post_tool_dashboard_sync.py
 
-対象スクリプト: `.github/hooks/scripts/post_tool_dashboard_sync.py`
+対象スクリプト: `.github/hooks/scripts/entrypoints/post_tool_dashboard_sync.py`
 
 ---
 

@@ -3,7 +3,7 @@
     "PreToolUse": [
       {
         "type": "command",
-        "command": "python .github/hooks/scripts/check_phase_gate.py",
+        "command": "python .github/hooks/scripts/entrypoints/check_phase_gate.py",
         "timeout": 15
       }
     ]

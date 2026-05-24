@@ -6,22 +6,34 @@ Always returns {"continue": true} — never blocks execution.
 
 Debug enable/disable
 --------------------
-ON  : create  .github/hooks/scripts/tool_input_spy.debug
-OFF : delete  .github/hooks/scripts/tool_input_spy.debug
+ON  : create  .github/hooks/scripts/entrypoints/tool_input_spy.debug
+OFF : delete  .github/hooks/scripts/entrypoints/tool_input_spy.debug
 
-Log file : .github/hooks/scripts/tool_input_spy.debug.log
+Log file : .github/hooks/scripts/entrypoints/tool_input_spy.debug.log
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 from typing import Dict
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPTS_DIR = SCRIPT_DIR.parent
+IMPORT_DIRS = (
+    SCRIPTS_DIR / "core",
+    SCRIPTS_DIR / "access_control",
+    SCRIPTS_DIR / "tooling",
+    SCRIPTS_DIR / "shared",
+)
+for import_dir in IMPORT_DIRS:
+    if str(import_dir) not in sys.path:
+        sys.path.insert(0, str(import_dir))
 
 from debug_logging import HookDebugLogger
 from hook_payload import read_payload
 
-SCRIPT_DIR = Path(__file__).resolve().parent
 DEBUG = HookDebugLogger(SCRIPT_DIR, "tool_input_spy")
 
 
@@ -50,7 +62,7 @@ def _sanitize(value: object, max_len: int = 300) -> object:
 def main() -> None:
     args = _parse_args()
     try:
-        payload = read_payload()
+        payload = read_payload(debug=DEBUG)
 
         tool_name: str = payload.get("tool_name") or "(unknown)"
         tool_input: Dict = payload.get("tool_input") or {}

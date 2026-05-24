@@ -1,9 +1,9 @@
 # testresult: check_phase_gate.py
 
-対象スクリプト: `.github/hooks/scripts/check_phase_gate.py`
-実行日: 2026-05-08
-コミットID: d8db764 (未コミット変更あり: _lib 一元管理統合)
-実行コマンド: `python -m unittest TestHooks/check_phase_gate/test_check_phase_gate.py -v`
+対象スクリプト: `.github/hooks/scripts/entrypoints/check_phase_gate.py`
+実行日: 2026-05-21
+コミットID: e4b618f
+実行コマンド: `cd TestHooks/check_phase_gate && python -m unittest test_check_phase_gate -v`
 総合結果: **PASS** (39/39)
 
 ---
