@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "python .github/hooks/scripts/entrypoints/lifecycle_payload_logger.py",
+        "timeout": 5
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "python .github/hooks/scripts/entrypoints/lifecycle_payload_logger.py",
+        "timeout": 5
+      }
+    ],
+    "SubagentStart": [
+      {
+        "type": "command",
+        "command": "python .github/hooks/scripts/entrypoints/lifecycle_payload_logger.py",
+        "timeout": 5
+      }
+    ],
+    "SubagentStop": [
+      {
+        "type": "command",
+        "command": "python .github/hooks/scripts/entrypoints/lifecycle_payload_logger.py",
+        "timeout": 5
+      }
+    ]
+  }
+}
