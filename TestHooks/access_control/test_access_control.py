@@ -532,8 +532,8 @@ class TestEvaluateWriteRules(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result.rule.action, "deny")
 
-    def test_AC206_whitelist_match_disabled_skips_matching(self):
-        """write: whitelist の match_enabled=false はマッチングをスキップ"""
+    def test_AC206_whitelist_match_disabled_still_applies(self):
+        """write: whitelist の match_enabled=false でも enabled=true なら評価される"""
         whitelist = WhitelistConfig(
             enabled=True,
             match_enabled=False,
@@ -548,12 +548,10 @@ class TestEvaluateWriteRules(unittest.TestCase):
             whitelist=whitelist,
         )
         ctx = MatchContext(tool_name="create_file", tool_input={"filePath": "docs/foo.md"})
-        result = evaluate(config, ctx)
-        self.assertIsNotNone(result)
-        self.assertEqual(result.rule.action, "deny")
+        self.assertIsNone(evaluate(config, ctx))
 
-    def test_AC207_whitelist_group_match_disabled_skips_matching(self):
-        """write: whitelist write_rules.match_enabled=false は操作タイプ単位でスキップ"""
+    def test_AC207_whitelist_group_match_disabled_still_applies(self):
+        """write: whitelist write_rules.match_enabled=false でも enabled=true なら評価される"""
         whitelist = WhitelistConfig(
             enabled=True,
             write_rules=WhitelistRuleGroup(
@@ -568,12 +566,10 @@ class TestEvaluateWriteRules(unittest.TestCase):
             whitelist=whitelist,
         )
         ctx = MatchContext(tool_name="create_file", tool_input={"filePath": "docs/foo.md"})
-        result = evaluate(config, ctx)
-        self.assertIsNotNone(result)
-        self.assertEqual(result.rule.action, "deny")
+        self.assertIsNone(evaluate(config, ctx))
 
-    def test_AC208_whitelist_item_match_disabled_skips_item(self):
-        """write: whitelist rule.match_enabled=false の項目は評価対象外"""
+    def test_AC208_whitelist_item_match_disabled_still_applies(self):
+        """write: whitelist rule.match_enabled=false でも enabled=true なら評価される"""
         whitelist = WhitelistConfig(
             enabled=True,
             write_rules=WhitelistRuleGroup(
@@ -592,9 +588,7 @@ class TestEvaluateWriteRules(unittest.TestCase):
             whitelist=whitelist,
         )
         ctx = MatchContext(tool_name="create_file", tool_input={"filePath": "docs/foo.md"})
-        result = evaluate(config, ctx)
-        self.assertIsNotNone(result)
-        self.assertEqual(result.rule.action, "deny")
+        self.assertIsNone(evaluate(config, ctx))
 
 
 # ---------------------------------------------------------------------------

@@ -49,9 +49,9 @@
 | AC-203 | whitelist 調停=confirm | `create_file` | `{"filePath": "docs/foo.md"}` | blacklist deny + whitelist `arbitration=confirm` | confirm を返す |
 | AC-204 | whitelist 調停=whitelist | `create_file` | `{"filePath": "docs/foo.md"}` | blacklist deny + whitelist `arbitration=whitelist` | `None` を返す（ブロックしない） |
 | AC-205 | whitelist 複数調停レベル競合 | `create_file` | `{"filePath": "docs/foo.md"}` | 同一パスに whitelist/confirm/blacklist ルールが同時マッチ | `blacklist` 優先で deny を返す |
-| AC-206 | whitelist match_enabled=false でスキップ | `create_file` | `{"filePath": "docs/foo.md"}` | whitelist 全体 `match_enabled=false` + blacklist deny | whitelist マッチングを行わず deny を返す |
-| AC-207 | whitelist write_rules.match_enabled=false でスキップ | `create_file` | `{"filePath": "docs/foo.md"}` | whitelist write_rules `match_enabled=false` + blacklist deny | 操作タイプ単位で whitelist マッチングを行わず deny を返す |
-| AC-208 | whitelist rule.match_enabled=false でスキップ | `create_file` | `{"filePath": "docs/foo.md"}` | whitelist 項目 `match_enabled=false` + blacklist deny | 設定項目単位で whitelist マッチングを行わず deny を返す |
+| AC-206 | whitelist `match_enabled=false` は無効化条件にならない | `create_file` | `{"filePath": "docs/foo.md"}` | whitelist 全体 `match_enabled=false` + blacklist deny + whitelist 調停=whitelist | whitelist 評価が適用され `None` を返す（allow） |
+| AC-207 | whitelist write_rules.`match_enabled=false` は無効化条件にならない | `create_file` | `{"filePath": "docs/foo.md"}` | whitelist write_rules `match_enabled=false` + blacklist deny + whitelist 調停=whitelist | 操作タイプ単位でも whitelist 評価が適用され `None` を返す |
+| AC-208 | whitelist rule.`match_enabled=false` は無効化条件にならない | `create_file` | `{"filePath": "docs/foo.md"}` | whitelist 項目 `match_enabled=false` + blacklist deny + whitelist 調停=whitelist | 設定項目単位でも whitelist 評価が適用され `None` を返す |
 
 #### read 操作
 
@@ -190,7 +190,7 @@
 |----------|------|------|----------|
 | AC-008a | `_parse_when` scope_patterns のみ | `{"scope_patterns": ["**/.env"]}` | `WhenClause.scope_patterns` に格納される |
 | AC-008b | `_parse_when` path + scope 両方 | `{"path_patterns": ["docs/**"], "scope_patterns": ["docs/**"]}` | 両フィールドに正しく格納される |
-| AC-200 | whitelist 設定の階層読み込み | global/group/item で arbitration と match_enabled を設定 | `AccessControlConfig.whitelist` に各階層値が正しく格納される |
+| AC-200 | whitelist 設定の階層読み込み | global/group/item で arbitration と match_enabled を設定 | `AccessControlConfig.whitelist` に各階層値が正しく格納される（`match_enabled` は後方互換フィールド） |
 | AC-201 | whitelist 不正 arbitration のフォールバック | `whitelist.arbitration="invalid"` | `blacklist` にフォールバックし、`skipped_rules` に警告が蓄積される |
 
 #### Scope patterns マッチング（glob 交差判定）

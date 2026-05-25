@@ -87,7 +87,11 @@ class WhitelistRule:
     when: WhenClause = field(default_factory=WhenClause)
 
     def is_active(self) -> bool:
-        return self.enabled and self.match_enabled
+        """Return whether this whitelist rule is active.
+
+        match_enabled は後方互換のため保持するが、enabled と同義として扱う。
+        """
+        return self.enabled
 
 
 @dataclass

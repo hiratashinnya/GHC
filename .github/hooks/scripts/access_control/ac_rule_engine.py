@@ -415,11 +415,11 @@ def _select_whitelist_arbitration(
     config: AccessControlConfig, operation_type: OperationType, context: MatchContext, debug: Optional[HookDebugLogger] = None
 ) -> Optional[str]:
     whitelist = config.whitelist
-    if not whitelist.enabled or not whitelist.match_enabled:
+    if not whitelist.enabled:
         return None
 
     group = whitelist.get_group(operation_type.value)
-    if not group.enabled or not group.match_enabled:
+    if not group.enabled:
         return None
 
     matched_arbitrations: List[str] = []
