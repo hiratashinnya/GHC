@@ -82,15 +82,11 @@ class WhitelistRule:
     rule_id: str = ""
     description: str = ""
     enabled: bool = True
-    match_enabled: bool = True
     arbitration: str = "blacklist"
     when: WhenClause = field(default_factory=WhenClause)
 
     def is_active(self) -> bool:
-        """Return whether this whitelist rule is active.
-
-        match_enabled は後方互換のため保持するが、enabled と同義として扱う。
-        """
+        """Return whether this whitelist rule is active."""
         return self.enabled
 
 
@@ -99,7 +95,6 @@ class WhitelistRuleGroup:
     """操作タイプごとのホワイトリスト設定。"""
 
     enabled: bool = True
-    match_enabled: bool = True
     arbitration: str = "blacklist"
     rules: List[WhitelistRule] = field(default_factory=list)
 
@@ -109,7 +104,6 @@ class WhitelistConfig:
     """ホワイトリスト機能全体の設定。"""
 
     enabled: bool = False
-    match_enabled: bool = True
     arbitration: str = "blacklist"
     write_rules: WhitelistRuleGroup = field(default_factory=WhitelistRuleGroup)
     read_rules: WhitelistRuleGroup = field(default_factory=WhitelistRuleGroup)
@@ -248,7 +242,6 @@ def _parse_whitelist_rule(raw: dict, errors: List[str], default_arbitration: str
         rule_id=rule_id,
         description=raw.get("description", ""),
         enabled=_to_bool(raw.get("enabled", True), True),
-        match_enabled=_to_bool(raw.get("match_enabled", True), True),
         arbitration=arbitration,
         when=_parse_when(raw.get("when") or {}),
     )
@@ -273,7 +266,6 @@ def _parse_whitelist_group(
     if isinstance(raw_group, list):
         return WhitelistRuleGroup(
             enabled=True,
-            match_enabled=True,
             arbitration=default_arbitration,
             rules=_parse_whitelist_rule_list(raw_group, errors, default_arbitration),
         )
@@ -286,7 +278,6 @@ def _parse_whitelist_group(
         )
         return WhitelistRuleGroup(
             enabled=_to_bool(raw_group.get("enabled", True), True),
-            match_enabled=_to_bool(raw_group.get("match_enabled", True), True),
             arbitration=group_arbitration,
             rules=_parse_whitelist_rule_list(raw_group.get("rules") or [], errors, group_arbitration),
         )
@@ -305,7 +296,6 @@ def _parse_whitelist(raw_whitelist: object, errors: List[str]) -> WhitelistConfi
     )
     return WhitelistConfig(
         enabled=_to_bool(raw_whitelist.get("enabled", False), False),
-        match_enabled=_to_bool(raw_whitelist.get("match_enabled", True), True),
         arbitration=global_arbitration,
         write_rules=_parse_whitelist_group(raw_whitelist.get("write_rules"), errors, global_arbitration),
         read_rules=_parse_whitelist_group(raw_whitelist.get("read_rules"), errors, global_arbitration),

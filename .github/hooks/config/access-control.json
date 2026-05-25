@@ -4,23 +4,19 @@
   "enabled": true,
   "whitelist": {
     "enabled": false,
-    "match_enabled": true,
     "arbitration": "blacklist",
     "write_rules": {
       "enabled": true,
-      "match_enabled": true,
       "arbitration": "blacklist",
       "rules": []
     },
     "read_rules": {
       "enabled": true,
-      "match_enabled": true,
       "arbitration": "blacklist",
       "rules": []
     },
     "command_rules": {
       "enabled": true,
-      "match_enabled": true,
       "arbitration": "blacklist",
       "rules": []
     }
