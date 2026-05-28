@@ -340,6 +340,23 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(config.whitelist.arbitration, "blacklist")
         self.assertTrue(any("arbitration" in warning for warning in config.skipped_rules))
 
+    def test_AC201b_whitelist_group_requires_dict_format(self):
+        """whitelist: group は dict 形式のみ受理し、list は無効として既定値を使う"""
+        data = {
+            "whitelist": {
+                "enabled": True,
+                "arbitration": "whitelist",
+                "write_rules": [
+                    {"id": "w1", "arbitration": "blacklist", "when": {"path_patterns": ["docs/**"]}}
+                ],
+            }
+        }
+        path = _write_config(self.tmppath, data)
+        config = load_config(path)
+        self.assertTrue(config.whitelist.enabled)
+        self.assertEqual(config.whitelist.write_rules.arbitration, "whitelist")
+        self.assertEqual(config.whitelist.write_rules.rules, [])
+
 
 # ---------------------------------------------------------------------------
 # ac_rule_engine — write operations
