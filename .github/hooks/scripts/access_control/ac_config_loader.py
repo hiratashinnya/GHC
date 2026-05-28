@@ -89,6 +89,26 @@ class WhitelistRule(RuleBase):
     enabled: bool = True
     arbitration: str = "blacklist"
 
+    @classmethod
+    def from_dict(cls, raw: object, errors: List[str], default_arbitration: str) -> "WhitelistRule":
+        if not isinstance(raw, dict):
+            return cls(arbitration=default_arbitration)
+
+        base = _parse_rule_base(raw)
+        arbitration = _parse_arbitration(
+            raw.get("arbitration"),
+            default_arbitration,
+            errors,
+            f"whitelist rule {base.rule_id or '(unknown)'}",
+        )
+        return cls(
+            rule_id=base.rule_id,
+            description=base.description,
+            enabled=_to_bool(raw.get("enabled", True), True),
+            arbitration=arbitration,
+            when=base.when,
+        )
+
     def is_active(self) -> bool:
         """Return whether this whitelist rule is active."""
         return self.enabled
@@ -102,6 +122,32 @@ class WhitelistRuleGroup:
     arbitration: str = "blacklist"
     rules: List[WhitelistRule] = field(default_factory=list)
 
+    @classmethod
+    def from_dict(
+        cls, raw_group: object, errors: List[str], default_arbitration: str
+    ) -> "WhitelistRuleGroup":
+        payload = _parse_group_payload(raw_group)
+        if payload is None:
+            return cls(arbitration=default_arbitration)
+
+        enabled, rules_raw = payload
+        if isinstance(raw_group, dict):
+            group_arbitration = _parse_arbitration(
+                raw_group.get("arbitration"),
+                default_arbitration,
+                errors,
+                "whitelist group",
+            )
+        else:
+            group_arbitration = default_arbitration
+
+        rules = _parse_rule_items(
+            rules_raw,
+            lambda item: WhitelistRule.from_dict(item, errors, group_arbitration),
+            errors,
+        )
+        return cls(enabled=enabled, arbitration=group_arbitration, rules=rules)
+
 
 @dataclass
 class WhitelistConfig:
@@ -112,6 +158,39 @@ class WhitelistConfig:
     write_rules: WhitelistRuleGroup = field(default_factory=WhitelistRuleGroup)
     read_rules: WhitelistRuleGroup = field(default_factory=WhitelistRuleGroup)
     command_rules: WhitelistRuleGroup = field(default_factory=WhitelistRuleGroup)
+
+    @classmethod
+    def from_dict(cls, raw_whitelist: object, errors: List[str]) -> "WhitelistConfig":
+        if not isinstance(raw_whitelist, dict):
+            return cls()
+
+        global_arbitration = _parse_arbitration(
+            raw_whitelist.get("arbitration"),
+            "blacklist",
+            errors,
+            "whitelist",
+        )
+        return cls(
+            enabled=_to_bool(raw_whitelist.get("enabled", False), False),
+            arbitration=global_arbitration,
+            write_rules=WhitelistRuleGroup.from_dict(
+                raw_whitelist.get("write_rules"), errors, global_arbitration
+            ),
+            read_rules=WhitelistRuleGroup.from_dict(
+                raw_whitelist.get("read_rules"), errors, global_arbitration
+            ),
+            command_rules=WhitelistRuleGroup.from_dict(
+                raw_whitelist.get("command_rules"), errors, global_arbitration
+            ),
+        )
+
+    @classmethod
+    def from_json(cls, raw_json: str, errors: List[str]) -> "WhitelistConfig":
+        try:
+            return cls.from_dict(json.loads(raw_json), errors)
+        except json.JSONDecodeError as exc:
+            errors.append(f"whitelist: JSON parse error - {exc}")
+            return cls()
 
     def get_group(self, operation_type: str) -> WhitelistRuleGroup:
         mapping = {
@@ -262,76 +341,6 @@ def _parse_rule_group(raw_group: object, errors: List[str]) -> RuleGroup:
     return RuleGroup()
 
 
-def _parse_whitelist_rule(raw: dict, errors: List[str], default_arbitration: str) -> WhitelistRule:
-    base = _parse_rule_base(raw)
-    arbitration = _parse_arbitration(
-        raw.get("arbitration"),
-        default_arbitration,
-        errors,
-        f"whitelist rule {base.rule_id or '(unknown)'}",
-    )
-    return WhitelistRule(
-        rule_id=base.rule_id,
-        description=base.description,
-        enabled=_to_bool(raw.get("enabled", True), True),
-        arbitration=arbitration,
-        when=base.when,
-    )
-
-
-def _parse_whitelist_rule_list(
-    raw_list: object, errors: List[str], default_arbitration: str
-) -> List[WhitelistRule]:
-    return _parse_rule_items(
-        raw_list,
-        lambda item: _parse_whitelist_rule(item, errors, default_arbitration),
-        errors,
-    )
-
-
-def _parse_whitelist_group(
-    raw_group: object, errors: List[str], default_arbitration: str
-) -> WhitelistRuleGroup:
-    payload = _parse_group_payload(raw_group)
-    if payload is not None:
-        enabled, rules_raw = payload
-        if isinstance(raw_group, dict):
-            group_arbitration = _parse_arbitration(
-                raw_group.get("arbitration"),
-                default_arbitration,
-                errors,
-                "whitelist group",
-            )
-        else:
-            group_arbitration = default_arbitration
-
-        return WhitelistRuleGroup(
-            enabled=enabled,
-            arbitration=group_arbitration,
-            rules=_parse_whitelist_rule_list(rules_raw, errors, group_arbitration),
-        )
-    return WhitelistRuleGroup(arbitration=default_arbitration)
-
-
-def _parse_whitelist(raw_whitelist: object, errors: List[str]) -> WhitelistConfig:
-    if not isinstance(raw_whitelist, dict):
-        return WhitelistConfig()
-
-    global_arbitration = _parse_arbitration(
-        raw_whitelist.get("arbitration"),
-        "blacklist",
-        errors,
-        "whitelist",
-    )
-    return WhitelistConfig(
-        enabled=_to_bool(raw_whitelist.get("enabled", False), False),
-        arbitration=global_arbitration,
-        write_rules=_parse_whitelist_group(raw_whitelist.get("write_rules"), errors, global_arbitration),
-        read_rules=_parse_whitelist_group(raw_whitelist.get("read_rules"), errors, global_arbitration),
-        command_rules=_parse_whitelist_group(raw_whitelist.get("command_rules"), errors, global_arbitration),
-    )
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -357,6 +366,6 @@ def load_config(config_path: Path) -> AccessControlConfig:
         write_rules=_parse_rule_group(raw.get("write_rules"), skipped),
         read_rules=_parse_rule_group(raw.get("read_rules"), skipped),
         command_rules=_parse_rule_group(raw.get("command_rules"), skipped),
-        whitelist=_parse_whitelist(raw.get("whitelist"), skipped),
+        whitelist=WhitelistConfig.from_dict(raw.get("whitelist"), skipped),
         skipped_rules=skipped,
     )
