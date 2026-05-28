@@ -27,7 +27,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple, TypeVar
+from typing import Callable, List, Optional, TypeVar
 
 VALID_ACTIONS: frozenset = frozenset({"deny", "confirm", "disabled"})
 VALID_ARBITRATIONS: frozenset = frozenset({"blacklist", "confirm", "whitelist"})
@@ -126,26 +126,24 @@ class WhitelistRuleGroup:
     def from_dict(
         cls, raw_group: object, errors: List[str], default_arbitration: str
     ) -> "WhitelistRuleGroup":
-        payload = _parse_group_payload(raw_group)
-        if payload is None:
+        if not isinstance(raw_group, dict):
             return cls(arbitration=default_arbitration)
 
-        enabled, rules_raw = payload
-        if isinstance(raw_group, dict):
-            group_arbitration = _parse_arbitration(
-                raw_group.get("arbitration"),
-                default_arbitration,
-                errors,
-                "whitelist group",
-            )
-        else:
-            group_arbitration = default_arbitration
-
-        rules = _parse_rule_items(
-            rules_raw,
-            lambda item: WhitelistRule.from_dict(item, errors, group_arbitration),
+        group_arbitration = _parse_arbitration(
+            raw_group.get("arbitration"),
+            default_arbitration,
             errors,
+            "whitelist group",
         )
+        enabled = _to_bool(raw_group.get("enabled", True), True)
+        raw_rules = raw_group.get("rules")
+        rules: List[WhitelistRule] = []
+        if isinstance(raw_rules, list):
+            for raw_rule in raw_rules:
+                if not isinstance(raw_rule, dict):
+                    continue
+                rules.append(WhitelistRule.from_dict(raw_rule, errors, group_arbitration))
+
         return cls(enabled=enabled, arbitration=group_arbitration, rules=rules)
 
 
@@ -266,14 +264,6 @@ def _parse_rule_base(raw: dict) -> RuleBase:
     )
 
 
-def _parse_group_payload(raw_group: object) -> Optional[Tuple[bool, object]]:
-    if isinstance(raw_group, list):
-        return True, raw_group
-    if isinstance(raw_group, dict):
-        return _to_bool(raw_group.get("enabled", True), True), (raw_group.get("rules") or [])
-    return None
-
-
 def _parse_rule(raw: dict) -> Rule:
     action = raw.get("action", "disabled")
     if action not in VALID_ACTIONS:
@@ -334,10 +324,11 @@ def _parse_rule_group(raw_group: object, errors: List[str]) -> RuleGroup:
 
     配列形式の場合は後方互換として enabled=True のグループとして扱う。
     """
-    payload = _parse_group_payload(raw_group)
-    if payload is not None:
-        enabled, rules_raw = payload
-        return RuleGroup(enabled=enabled, rules=_parse_rule_list(rules_raw, errors))
+    if isinstance(raw_group, list):
+        return RuleGroup(enabled=True, rules=_parse_rule_list(raw_group, errors))
+    if isinstance(raw_group, dict):
+        enabled = _to_bool(raw_group.get("enabled", True), True)
+        return RuleGroup(enabled=enabled, rules=_parse_rule_list(raw_group.get("rules"), errors))
     return RuleGroup()
 
 
