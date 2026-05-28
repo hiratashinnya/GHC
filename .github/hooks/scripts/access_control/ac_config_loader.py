@@ -58,6 +58,14 @@ class RuleBase:
     description: str = ""
     when: WhenClause = field(default_factory=WhenClause)
 
+    @classmethod
+    def from_dict(cls, raw: dict) -> "RuleBase":
+        return cls(
+            rule_id=raw.get("id", ""),
+            description=raw.get("description", ""),
+            when=_parse_when(raw.get("when") or {}),
+        )
+
 
 @dataclass
 class Rule(RuleBase):
@@ -76,7 +84,7 @@ class Rule(RuleBase):
                 f"ルール {raw.get('id', '(unknown)')!r}: 不正な action {action!r}。"
                 f"有効な値: {sorted(VALID_ACTIONS)}"
             )
-        base = _parse_rule_base(raw)
+        base = RuleBase.from_dict(raw)
         return cls(
             rule_id=base.rule_id,
             description=base.description,
@@ -147,7 +155,7 @@ class WhitelistRule(RuleBase):
         if not isinstance(raw, dict):
             return cls(arbitration=default_arbitration)
 
-        base = _parse_rule_base(raw)
+        base = RuleBase.from_dict(raw)
         arbitration = _parse_arbitration(
             raw.get("arbitration"),
             default_arbitration,
@@ -305,14 +313,6 @@ def _parse_arbitration(raw: object, default: str, errors: List[str], context: st
         )
         return default
     return value
-
-
-def _parse_rule_base(raw: dict) -> RuleBase:
-    return RuleBase(
-        rule_id=raw.get("id", ""),
-        description=raw.get("description", ""),
-        when=_parse_when(raw.get("when") or {}),
-    )
 
 
 def _parse_rule_items(
