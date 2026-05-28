@@ -49,6 +49,16 @@ class WhenClause:
     command_patterns: List[str] = field(default_factory=list)
     scope_patterns: List[str] = field(default_factory=list)
 
+    @classmethod
+    def from_dict(cls, raw_when: object) -> "WhenClause":
+        if not isinstance(raw_when, dict):
+            return cls()
+        return cls(
+            path_patterns=list(raw_when.get("path_patterns") or []),
+            command_patterns=list(raw_when.get("command_patterns") or []),
+            scope_patterns=list(raw_when.get("scope_patterns") or []),
+        )
+
 
 @dataclass
 class RuleBase:
@@ -63,7 +73,7 @@ class RuleBase:
         return cls(
             rule_id=raw.get("id", ""),
             description=raw.get("description", ""),
-            when=_parse_when(raw.get("when") or {}),
+            when=WhenClause.from_dict(raw.get("when")),
         )
 
 
@@ -128,6 +138,23 @@ class RuleGroup(RuleGroupParserBase):
     enabled: bool = True
     rules: List[Rule] = field(default_factory=list)
 
+    @staticmethod
+    def _validate_command_patterns(item: dict, rule: Rule, errors: List[str]) -> None:
+        # Validate command_patterns as regex
+        rule_id = item.get("id", "(unknown)")
+        for pattern in rule.when.command_patterns:
+            try:
+                re.compile(pattern)
+            except re.error as exc:
+                errors.append(f"invalid regex in rule {rule_id}: {pattern} - {exc}")
+
+    @classmethod
+    def _parse_rule_list(cls, raw_list: object, errors: List[str]) -> List[Rule]:
+        def _after_parse(item: dict, rule: Rule) -> None:
+            cls._validate_command_patterns(item, rule, errors)
+
+        return _parse_rule_items(raw_list, Rule.from_dict, errors, after_parse=_after_parse)
+
     @classmethod
     def from_dict(cls, raw_group: object, errors: List[str]) -> "RuleGroup":
         """操作タイプごとのルールグループをパースする。
@@ -135,10 +162,10 @@ class RuleGroup(RuleGroupParserBase):
         配列形式の場合は後方互換として enabled=True のグループとして扱う。
         """
         if isinstance(raw_group, list):
-            return cls(enabled=True, rules=_parse_rule_list(raw_group, errors))
+            return cls(enabled=True, rules=cls._parse_rule_list(raw_group, errors))
         if isinstance(raw_group, dict):
             enabled = cls._parse_enabled(raw_group, default=True)
-            rules = _parse_rule_list(raw_group.get("rules"), errors)
+            rules = cls._parse_rule_list(raw_group.get("rules"), errors)
             return cls(enabled=enabled, rules=rules)
         return cls()
 
@@ -279,6 +306,25 @@ class AccessControlConfig:
     whitelist: WhitelistConfig = field(default_factory=WhitelistConfig)
     skipped_rules: List[str] = field(default_factory=list)
 
+    @classmethod
+    def from_dict(cls, raw: object) -> "AccessControlConfig":
+        if not isinstance(raw, dict):
+            return cls()
+
+        skipped: List[str] = []
+        raw_enabled = raw.get("enabled", True)
+        enabled = raw_enabled if isinstance(raw_enabled, bool) else True
+        return cls(
+            enabled=enabled,
+            description=raw.get("description", ""),
+            version=raw.get("version", "1.0"),
+            write_rules=RuleGroup.from_dict(raw.get("write_rules"), skipped),
+            read_rules=RuleGroup.from_dict(raw.get("read_rules"), skipped),
+            command_rules=RuleGroup.from_dict(raw.get("command_rules"), skipped),
+            whitelist=WhitelistConfig.from_dict(raw.get("whitelist"), skipped),
+            skipped_rules=skipped,
+        )
+
     def get_group(self, operation_type: str) -> "RuleGroup":
         """operation_type に対応する RuleGroup を返す。未知の操作タイプは空 RuleGroup を返す。"""
         mapping = {
@@ -287,18 +333,6 @@ class AccessControlConfig:
             "command": self.command_rules,
         }
         return mapping.get(operation_type, RuleGroup())
-
-
-# ---------------------------------------------------------------------------
-# Internal parsers
-# ---------------------------------------------------------------------------
-
-def _parse_when(raw_when: dict) -> WhenClause:
-    return WhenClause(
-        path_patterns=list(raw_when.get("path_patterns") or []),
-        command_patterns=list(raw_when.get("command_patterns") or []),
-        scope_patterns=list(raw_when.get("scope_patterns") or []),
-    )
 
 
 def _to_bool(raw: object, default: bool) -> bool:
@@ -338,23 +372,6 @@ def _parse_rule_items(
     return rules
 
 
-def _parse_rule_list(raw_list: object, errors: List[str]) -> List[Rule]:
-    def _validate_command_patterns(item: dict, rule: Rule) -> None:
-        # Validate command_patterns as regex
-        rule_id = item.get("id", "(unknown)")
-        for pattern in rule.when.command_patterns:
-            try:
-                re.compile(pattern)
-            except re.error as exc:
-                errors.append(f"invalid regex in rule {rule_id}: {pattern} - {exc}")
-
-    return _parse_rule_items(raw_list, Rule.from_dict, errors, after_parse=_validate_command_patterns)
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
 def load_config(config_path: Path) -> AccessControlConfig:
     """アクセス制御設定を JSON ファイルから読み込む。
 
@@ -366,16 +383,4 @@ def load_config(config_path: Path) -> AccessControlConfig:
         action に無効な値を持つルールは ValueError を送出せず当該ルールのみスキップする。
     """
     raw = json.loads(config_path.read_text(encoding="utf-8"))
-    skipped: List[str] = []
-    raw_enabled = raw.get("enabled", True)
-    enabled = raw_enabled if isinstance(raw_enabled, bool) else True
-    return AccessControlConfig(
-        enabled=enabled,
-        description=raw.get("description", ""),
-        version=raw.get("version", "1.0"),
-        write_rules=RuleGroup.from_dict(raw.get("write_rules"), skipped),
-        read_rules=RuleGroup.from_dict(raw.get("read_rules"), skipped),
-        command_rules=RuleGroup.from_dict(raw.get("command_rules"), skipped),
-        whitelist=WhitelistConfig.from_dict(raw.get("whitelist"), skipped),
-        skipped_rules=skipped,
-    )
+    return AccessControlConfig.from_dict(raw)
