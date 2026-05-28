@@ -27,7 +27,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
+from typing import Callable, List, Optional, Tuple, TypeVar
 
 VALID_ACTIONS: frozenset = frozenset({"deny", "confirm", "disabled"})
 VALID_ARBITRATIONS: frozenset = frozenset({"blacklist", "confirm", "whitelist"})
@@ -51,12 +51,19 @@ class WhenClause:
 
 
 @dataclass
-class Rule:
-    """単一のアクセス制御ルール。"""
+class RuleBase:
+    """ルール共通データ。"""
+
     rule_id: str = ""
     description: str = ""
-    action: str = "disabled"
     when: WhenClause = field(default_factory=WhenClause)
+
+
+@dataclass
+class Rule(RuleBase):
+    """単一のアクセス制御ルール。"""
+
+    action: str = "disabled"
 
     def is_active(self) -> bool:
         """action が "disabled" でない場合に True を返す。"""
@@ -76,14 +83,11 @@ class RuleGroup:
 
 
 @dataclass
-class WhitelistRule:
+class WhitelistRule(RuleBase):
     """ホワイトリストの単一設定項目。"""
 
-    rule_id: str = ""
-    description: str = ""
     enabled: bool = True
     arbitration: str = "blacklist"
-    when: WhenClause = field(default_factory=WhenClause)
 
     def is_active(self) -> bool:
         """Return whether this whitelist rule is active."""
@@ -175,6 +179,22 @@ def _parse_arbitration(raw: object, default: str, errors: List[str], context: st
     return value
 
 
+def _parse_rule_base(raw: dict) -> RuleBase:
+    return RuleBase(
+        rule_id=raw.get("id", ""),
+        description=raw.get("description", ""),
+        when=_parse_when(raw.get("when") or {}),
+    )
+
+
+def _parse_group_payload(raw_group: object) -> Optional[Tuple[bool, object]]:
+    if isinstance(raw_group, list):
+        return True, raw_group
+    if isinstance(raw_group, dict):
+        return _to_bool(raw_group.get("enabled", True), True), (raw_group.get("rules") or [])
+    return None
+
+
 def _parse_rule(raw: dict) -> Rule:
     action = raw.get("action", "disabled")
     if action not in VALID_ACTIONS:
@@ -182,35 +202,52 @@ def _parse_rule(raw: dict) -> Rule:
             f"ルール {raw.get('id', '(unknown)')!r}: 不正な action {action!r}。"
             f"有効な値: {sorted(VALID_ACTIONS)}"
         )
+    base = _parse_rule_base(raw)
     return Rule(
-        rule_id=raw.get("id", ""),
-        description=raw.get("description", ""),
+        rule_id=base.rule_id,
+        description=base.description,
         action=action,
-        when=_parse_when(raw.get("when") or {}),
+        when=base.when,
     )
 
 
-def _parse_rule_list(raw_list: object, errors: List[str]) -> List[Rule]:
+RuleT = TypeVar("RuleT")
+
+
+def _parse_rule_items(
+    raw_list: object,
+    parse_item: Callable[[dict], RuleT],
+    errors: List[str],
+    after_parse: Optional[Callable[[dict, RuleT], None]] = None,
+) -> List[RuleT]:
     if not isinstance(raw_list, list):
         return []
-    rules: List[Rule] = []
+
+    rules: List[RuleT] = []
     for item in raw_list:
         if not isinstance(item, dict):
             continue
         try:
-            rule = _parse_rule(item)
-            # Validate command_patterns as regex
-            rule_id = item.get("id", "(unknown)")
-            for pattern in rule.when.command_patterns:
-                try:
-                    re.compile(pattern)
-                except re.error as exc:
-                    errors.append(f"invalid regex in rule {rule_id}: {pattern} - {exc}")
-            rules.append(rule)
+            parsed = parse_item(item)
+            if after_parse:
+                after_parse(item, parsed)
+            rules.append(parsed)
         except ValueError as exc:
-            # 不正なルールはスキップし、エラー内容を errors に収集してユーザーへの通知に使う
             errors.append(str(exc))
     return rules
+
+
+def _parse_rule_list(raw_list: object, errors: List[str]) -> List[Rule]:
+    def _validate_command_patterns(item: dict, rule: Rule) -> None:
+        # Validate command_patterns as regex
+        rule_id = item.get("id", "(unknown)")
+        for pattern in rule.when.command_patterns:
+            try:
+                re.compile(pattern)
+            except re.error as exc:
+                errors.append(f"invalid regex in rule {rule_id}: {pattern} - {exc}")
+
+    return _parse_rule_items(raw_list, _parse_rule, errors, after_parse=_validate_command_patterns)
 
 
 def _parse_rule_group(raw_group: object, errors: List[str]) -> RuleGroup:
@@ -218,68 +255,60 @@ def _parse_rule_group(raw_group: object, errors: List[str]) -> RuleGroup:
 
     配列形式の場合は後方互換として enabled=True のグループとして扱う。
     """
-    if isinstance(raw_group, list):
-        return RuleGroup(enabled=True, rules=_parse_rule_list(raw_group, errors))
-    if isinstance(raw_group, dict):
-        raw_enabled = raw_group.get("enabled", True)
-        enabled = raw_enabled if isinstance(raw_enabled, bool) else True
-        return RuleGroup(
-            enabled=enabled,
-            rules=_parse_rule_list(raw_group.get("rules") or [], errors),
-        )
+    payload = _parse_group_payload(raw_group)
+    if payload is not None:
+        enabled, rules_raw = payload
+        return RuleGroup(enabled=enabled, rules=_parse_rule_list(rules_raw, errors))
     return RuleGroup()
 
 
 def _parse_whitelist_rule(raw: dict, errors: List[str], default_arbitration: str) -> WhitelistRule:
-    rule_id = raw.get("id", "")
+    base = _parse_rule_base(raw)
     arbitration = _parse_arbitration(
         raw.get("arbitration"),
         default_arbitration,
         errors,
-        f"whitelist rule {rule_id or '(unknown)'}",
+        f"whitelist rule {base.rule_id or '(unknown)'}",
     )
     return WhitelistRule(
-        rule_id=rule_id,
-        description=raw.get("description", ""),
+        rule_id=base.rule_id,
+        description=base.description,
         enabled=_to_bool(raw.get("enabled", True), True),
         arbitration=arbitration,
-        when=_parse_when(raw.get("when") or {}),
+        when=base.when,
     )
 
 
 def _parse_whitelist_rule_list(
     raw_list: object, errors: List[str], default_arbitration: str
 ) -> List[WhitelistRule]:
-    if not isinstance(raw_list, list):
-        return []
-    rules: List[WhitelistRule] = []
-    for item in raw_list:
-        if not isinstance(item, dict):
-            continue
-        rules.append(_parse_whitelist_rule(item, errors, default_arbitration))
-    return rules
+    return _parse_rule_items(
+        raw_list,
+        lambda item: _parse_whitelist_rule(item, errors, default_arbitration),
+        errors,
+    )
 
 
 def _parse_whitelist_group(
     raw_group: object, errors: List[str], default_arbitration: str
 ) -> WhitelistRuleGroup:
-    if isinstance(raw_group, list):
+    payload = _parse_group_payload(raw_group)
+    if payload is not None:
+        enabled, rules_raw = payload
+        if isinstance(raw_group, dict):
+            group_arbitration = _parse_arbitration(
+                raw_group.get("arbitration"),
+                default_arbitration,
+                errors,
+                "whitelist group",
+            )
+        else:
+            group_arbitration = default_arbitration
+
         return WhitelistRuleGroup(
-            enabled=True,
-            arbitration=default_arbitration,
-            rules=_parse_whitelist_rule_list(raw_group, errors, default_arbitration),
-        )
-    if isinstance(raw_group, dict):
-        group_arbitration = _parse_arbitration(
-            raw_group.get("arbitration"),
-            default_arbitration,
-            errors,
-            "whitelist group",
-        )
-        return WhitelistRuleGroup(
-            enabled=_to_bool(raw_group.get("enabled", True), True),
+            enabled=enabled,
             arbitration=group_arbitration,
-            rules=_parse_whitelist_rule_list(raw_group.get("rules") or [], errors, group_arbitration),
+            rules=_parse_whitelist_rule_list(rules_raw, errors, group_arbitration),
         )
     return WhitelistRuleGroup(arbitration=default_arbitration)
 
