@@ -65,13 +65,52 @@ class Rule(RuleBase):
 
     action: str = "disabled"
 
+    @classmethod
+    def from_dict(cls, raw: object) -> "Rule":
+        if not isinstance(raw, dict):
+            raise ValueError("rule item must be dict")
+
+        action = raw.get("action", "disabled")
+        if action not in VALID_ACTIONS:
+            raise ValueError(
+                f"ルール {raw.get('id', '(unknown)')!r}: 不正な action {action!r}。"
+                f"有効な値: {sorted(VALID_ACTIONS)}"
+            )
+        base = _parse_rule_base(raw)
+        return cls(
+            rule_id=base.rule_id,
+            description=base.description,
+            action=action,
+            when=base.when,
+        )
+
     def is_active(self) -> bool:
         """action が "disabled" でない場合に True を返す。"""
         return self.action != "disabled"
 
 
+RuleT = TypeVar("RuleT")
+
+
+class RuleGroupParserBase:
+    """ルールグループの共通パース処理を提供する基底クラス。"""
+
+    @staticmethod
+    def _parse_enabled(raw_group: dict, default: bool = True) -> bool:
+        return _to_bool(raw_group.get("enabled", default), default)
+
+    @staticmethod
+    def _parse_rules(
+        raw_rules: object,
+        parse_item: Callable[[dict], RuleT],
+        errors: List[str],
+        after_parse: Optional[Callable[[dict, RuleT], None]] = None,
+    ) -> List[RuleT]:
+        return _parse_rule_items(raw_rules, parse_item, errors, after_parse=after_parse)
+
+
 @dataclass
-class RuleGroup:
+class RuleGroup(RuleGroupParserBase):
     """操作タイプごとのルールグループ。enabled でグループ単位の有効/無効を切り替えられる。
 
     拡張ガイド:
@@ -80,6 +119,20 @@ class RuleGroup:
     """
     enabled: bool = True
     rules: List[Rule] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, raw_group: object, errors: List[str]) -> "RuleGroup":
+        """操作タイプごとのルールグループをパースする。
+
+        配列形式の場合は後方互換として enabled=True のグループとして扱う。
+        """
+        if isinstance(raw_group, list):
+            return cls(enabled=True, rules=_parse_rule_list(raw_group, errors))
+        if isinstance(raw_group, dict):
+            enabled = cls._parse_enabled(raw_group, default=True)
+            rules = _parse_rule_list(raw_group.get("rules"), errors)
+            return cls(enabled=enabled, rules=rules)
+        return cls()
 
 
 @dataclass
@@ -115,7 +168,7 @@ class WhitelistRule(RuleBase):
 
 
 @dataclass
-class WhitelistRuleGroup:
+class WhitelistRuleGroup(RuleGroupParserBase):
     """操作タイプごとのホワイトリスト設定。"""
 
     enabled: bool = True
@@ -135,14 +188,12 @@ class WhitelistRuleGroup:
             errors,
             "whitelist group",
         )
-        enabled = _to_bool(raw_group.get("enabled", True), True)
-        raw_rules = raw_group.get("rules")
-        rules: List[WhitelistRule] = []
-        if isinstance(raw_rules, list):
-            for raw_rule in raw_rules:
-                if not isinstance(raw_rule, dict):
-                    continue
-                rules.append(WhitelistRule.from_dict(raw_rule, errors, group_arbitration))
+        enabled = cls._parse_enabled(raw_group, default=True)
+
+        def _parse_whitelist_rule_item(item: dict) -> WhitelistRule:
+            return WhitelistRule.from_dict(item, errors, group_arbitration)
+
+        rules = cls._parse_rules(raw_group.get("rules"), _parse_whitelist_rule_item, errors)
 
         return cls(enabled=enabled, arbitration=group_arbitration, rules=rules)
 
@@ -264,25 +315,6 @@ def _parse_rule_base(raw: dict) -> RuleBase:
     )
 
 
-def _parse_rule(raw: dict) -> Rule:
-    action = raw.get("action", "disabled")
-    if action not in VALID_ACTIONS:
-        raise ValueError(
-            f"ルール {raw.get('id', '(unknown)')!r}: 不正な action {action!r}。"
-            f"有効な値: {sorted(VALID_ACTIONS)}"
-        )
-    base = _parse_rule_base(raw)
-    return Rule(
-        rule_id=base.rule_id,
-        description=base.description,
-        action=action,
-        when=base.when,
-    )
-
-
-RuleT = TypeVar("RuleT")
-
-
 def _parse_rule_items(
     raw_list: object,
     parse_item: Callable[[dict], RuleT],
@@ -316,20 +348,7 @@ def _parse_rule_list(raw_list: object, errors: List[str]) -> List[Rule]:
             except re.error as exc:
                 errors.append(f"invalid regex in rule {rule_id}: {pattern} - {exc}")
 
-    return _parse_rule_items(raw_list, _parse_rule, errors, after_parse=_validate_command_patterns)
-
-
-def _parse_rule_group(raw_group: object, errors: List[str]) -> RuleGroup:
-    """操作タイプごとのルールグループをパースする。
-
-    配列形式の場合は後方互換として enabled=True のグループとして扱う。
-    """
-    if isinstance(raw_group, list):
-        return RuleGroup(enabled=True, rules=_parse_rule_list(raw_group, errors))
-    if isinstance(raw_group, dict):
-        enabled = _to_bool(raw_group.get("enabled", True), True)
-        return RuleGroup(enabled=enabled, rules=_parse_rule_list(raw_group.get("rules"), errors))
-    return RuleGroup()
+    return _parse_rule_items(raw_list, Rule.from_dict, errors, after_parse=_validate_command_patterns)
 
 
 # ---------------------------------------------------------------------------
@@ -354,9 +373,9 @@ def load_config(config_path: Path) -> AccessControlConfig:
         enabled=enabled,
         description=raw.get("description", ""),
         version=raw.get("version", "1.0"),
-        write_rules=_parse_rule_group(raw.get("write_rules"), skipped),
-        read_rules=_parse_rule_group(raw.get("read_rules"), skipped),
-        command_rules=_parse_rule_group(raw.get("command_rules"), skipped),
+        write_rules=RuleGroup.from_dict(raw.get("write_rules"), skipped),
+        read_rules=RuleGroup.from_dict(raw.get("read_rules"), skipped),
+        command_rules=RuleGroup.from_dict(raw.get("command_rules"), skipped),
         whitelist=WhitelistConfig.from_dict(raw.get("whitelist"), skipped),
         skipped_rules=skipped,
     )
