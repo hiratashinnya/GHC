@@ -268,14 +268,6 @@ class WhitelistConfig:
             ),
         )
 
-    @classmethod
-    def from_json(cls, raw_json: str, errors: List[str]) -> "WhitelistConfig":
-        try:
-            return cls.from_dict(json.loads(raw_json), errors)
-        except json.JSONDecodeError as exc:
-            errors.append(f"whitelist: JSON parse error - {exc}")
-            return cls()
-
     def get_group(self, operation_type: str) -> WhitelistRuleGroup:
         mapping = {
             "write": self.write_rules,
