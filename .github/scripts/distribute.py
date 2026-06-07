@@ -55,8 +55,8 @@ def _run_distribution(args: argparse.Namespace) -> DistResult:
     )
 
     copied = copy_files_to_dist(target, out_dir, repo_root)
-    readme_path = generate_readme(target, out_dir, copied, repo_root)
     ps1_path, sh_path = generate_deploy_scripts(target, out_dir)
+    readme_path = generate_readme(target, out_dir, copied, repo_root)
 
     return DistResult(
         out_dir=out_dir,

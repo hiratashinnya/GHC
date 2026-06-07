@@ -110,6 +110,9 @@ def generate_readme(
     出力: 生成した README.md のパス
     副作用: ファイルへの書き込み
     """
+    readme_path = out_dir / "README.md"
+    # README.md が自身の配布物ツリーに表示されるよう事前に作成しておく
+    readme_path.touch(exist_ok=True)
     tree_text = "\n".join(_build_folder_tree(out_dir))
     placement_text = _build_placement_text(copied_files, out_dir)
     target_label = _target_label(target.target_type)
@@ -229,6 +232,5 @@ bash deploy.sh <対象リポジトリのパス>
 - Python 標準ライブラリのみを使用しています（追加インストール不要）
 """
 
-    readme_path = out_dir / "README.md"
     readme_path.write_text(content, encoding="utf-8")
     return readme_path

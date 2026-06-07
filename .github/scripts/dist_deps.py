@@ -121,6 +121,13 @@ def _build_search_dirs(scripts_root: Path, repo_root: Path) -> List[Path]:
     ]
 
 
+def _resolve_relative_token(token: str, repo_root: Path) -> Path:
+    """トークンの先頭にある相対パス指定 './' を安全に除去して絶対パスを解決する。"""
+    clean_token = token[2:] if token.startswith("./") else token
+    clean_path = Path(clean_token)
+    return clean_path if clean_path.is_absolute() else (repo_root / clean_token)
+
+
 def _find_config_paths_from_json(hook_json_path: Path, repo_root: Path) -> List[Path]:
     """フック JSON 内のコマンド文字列から設定ファイルパスを抽出する。
 
@@ -136,7 +143,7 @@ def _find_config_paths_from_json(hook_json_path: Path, repo_root: Path) -> List[
             for cmd in commands:
                 for token in shlex.split(cmd.get("command", "")):
                     if token.endswith(".json") and "config" in token:
-                        cfg = repo_root / token.lstrip("./")
+                        cfg = _resolve_relative_token(token, repo_root)
                         if cfg.exists():
                             config_paths.append(cfg)
     except (ValueError, json.JSONDecodeError, KeyError):
@@ -162,12 +169,7 @@ def _find_entrypoints_from_hook_json(hook_json_path: Path, repo_root: Path) -> L
             script_token = next((token for token in tokens if token.endswith(".py")), None)
             if script_token is None:
                 continue
-            script_path = Path(script_token)
-            candidate = (
-                script_path
-                if script_path.is_absolute()
-                else (repo_root / script_token.lstrip("./"))
-            )
+            candidate = _resolve_relative_token(script_token, repo_root)
             if candidate.exists() and candidate not in entrypoints:
                 entrypoints.append(candidate)
 
