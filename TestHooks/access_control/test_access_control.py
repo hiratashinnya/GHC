@@ -20,6 +20,9 @@ from ac_config_loader import (
     Rule,
     RuleGroup,
     AccessControlConfig,
+    WhitelistConfig,
+    WhitelistRule,
+    WhitelistRuleGroup,
     load_config,
     VALID_ACTIONS,
 )
@@ -59,12 +62,14 @@ def _make_config(
     write_enabled=True,
     read_enabled=True,
     command_enabled=True,
+    whitelist=None,
 ) -> AccessControlConfig:
     return AccessControlConfig(
         enabled=enabled,
         write_rules=RuleGroup(enabled=write_enabled, rules=write_rules or []),
         read_rules=RuleGroup(enabled=read_enabled, rules=read_rules or []),
         command_rules=RuleGroup(enabled=command_enabled, rules=command_rules or []),
+        whitelist=whitelist or WhitelistConfig(),
     )
 
 
@@ -97,6 +102,26 @@ def _disabled_rule(rule_id: str, path_patterns=None) -> Rule:
         rule_id=rule_id,
         action="disabled",
         when=WhenClause(path_patterns=path_patterns or []),
+    )
+
+
+def _whitelist_rule(
+    rule_id: str,
+    path_patterns=None,
+    command_patterns=None,
+    scope_patterns=None,
+    arbitration="blacklist",
+    enabled=True,
+) -> WhitelistRule:
+    return WhitelistRule(
+        rule_id=rule_id,
+        arbitration=arbitration,
+        enabled=enabled,
+        when=WhenClause(
+            path_patterns=path_patterns or [],
+            command_patterns=command_patterns or [],
+            scope_patterns=scope_patterns or [],
+        ),
     )
 
 
@@ -276,6 +301,62 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(config.read_rules.rules[0].when.path_patterns, ["docs/**"])
         self.assertEqual(config.read_rules.rules[0].when.scope_patterns, ["docs/**"])
 
+    def test_AC200_parse_whitelist_global_group_and_item(self):
+        """whitelist: global/group/item 設定が読み込まれる"""
+        data = {
+            "whitelist": {
+                "enabled": True,
+                "arbitration": "whitelist",
+                "write_rules": {
+                    "enabled": True,
+                    "arbitration": "confirm",
+                    "rules": [
+                        {
+                            "id": "w1",
+                            "arbitration": "blacklist",
+                            "when": {"path_patterns": ["docs/**"]},
+                        }
+                    ],
+                },
+            }
+        }
+        path = _write_config(self.tmppath, data)
+        config = load_config(path)
+        self.assertTrue(config.whitelist.enabled)
+        self.assertEqual(config.whitelist.arbitration, "whitelist")
+        self.assertEqual(config.whitelist.write_rules.arbitration, "confirm")
+        self.assertEqual(config.whitelist.write_rules.rules[0].arbitration, "blacklist")
+
+    def test_AC201_parse_whitelist_arbitration_fallback_with_warning(self):
+        """whitelist: 不正 arbitration は blacklist にフォールバックし warning 収集"""
+        data = {
+            "whitelist": {
+                "enabled": True,
+                "arbitration": "invalid",
+            }
+        }
+        path = _write_config(self.tmppath, data)
+        config = load_config(path)
+        self.assertEqual(config.whitelist.arbitration, "blacklist")
+        self.assertTrue(any("arbitration" in warning for warning in config.skipped_rules))
+
+    def test_AC201b_whitelist_group_requires_dict_format(self):
+        """whitelist: group は dict 形式のみ受理し、list は無効として既定値を使う"""
+        data = {
+            "whitelist": {
+                "enabled": True,
+                "arbitration": "whitelist",
+                "write_rules": [
+                    {"id": "w1", "arbitration": "blacklist", "when": {"path_patterns": ["docs/**"]}}
+                ],
+            }
+        }
+        path = _write_config(self.tmppath, data)
+        config = load_config(path)
+        self.assertTrue(config.whitelist.enabled)
+        self.assertEqual(config.whitelist.write_rules.arbitration, "whitelist")
+        self.assertEqual(config.whitelist.write_rules.rules, [])
+
 
 # ---------------------------------------------------------------------------
 # ac_rule_engine — write operations
@@ -374,6 +455,157 @@ class TestEvaluateWriteRules(unittest.TestCase):
         result = evaluate(config, ctx)
         self.assertIsNotNone(result)
         self.assertIn("docs/a.md", result.matched_values)
+
+    def test_AC202_whitelist_blacklist_priority_keeps_deny(self):
+        """write: whitelist arbitration=blacklist は deny を維持"""
+        whitelist = WhitelistConfig(
+            enabled=True,
+            write_rules=WhitelistRuleGroup(
+                rules=[
+                    _whitelist_rule(
+                        "w1",
+                        path_patterns=["docs/**"],
+                        arbitration="blacklist",
+                    )
+                ]
+            ),
+        )
+        config = _make_config(
+            write_rules=[_deny_rule("r1", path_patterns=["docs/**"])],
+            whitelist=whitelist,
+        )
+        ctx = MatchContext(tool_name="create_file", tool_input={"filePath": "docs/foo.md"})
+        result = evaluate(config, ctx)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.rule.action, "deny")
+
+    def test_AC203_whitelist_confirm_demotes_deny_to_confirm(self):
+        """write: whitelist arbitration=confirm は deny を confirm に調停"""
+        whitelist = WhitelistConfig(
+            enabled=True,
+            write_rules=WhitelistRuleGroup(
+                rules=[
+                    _whitelist_rule(
+                        "w1",
+                        path_patterns=["docs/**"],
+                        arbitration="confirm",
+                    )
+                ]
+            ),
+        )
+        config = _make_config(
+            write_rules=[_deny_rule("r1", path_patterns=["docs/**"])],
+            whitelist=whitelist,
+        )
+        ctx = MatchContext(tool_name="create_file", tool_input={"filePath": "docs/foo.md"})
+        result = evaluate(config, ctx)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.rule.action, "confirm")
+
+    def test_AC204_whitelist_priority_allows_despite_blacklist(self):
+        """write: whitelist arbitration=whitelist は blacklist を無効化して allow"""
+        whitelist = WhitelistConfig(
+            enabled=True,
+            write_rules=WhitelistRuleGroup(
+                rules=[
+                    _whitelist_rule(
+                        "w1",
+                        path_patterns=["docs/**"],
+                        arbitration="whitelist",
+                    )
+                ]
+            ),
+        )
+        config = _make_config(
+            write_rules=[_deny_rule("r1", path_patterns=["docs/**"])],
+            whitelist=whitelist,
+        )
+        ctx = MatchContext(tool_name="create_file", tool_input={"filePath": "docs/foo.md"})
+        self.assertIsNone(evaluate(config, ctx))
+
+    def test_AC205_whitelist_multi_match_prefers_blacklist_priority(self):
+        """write: whitelist 複数マッチ時は blacklist > confirm > whitelist 優先"""
+        whitelist = WhitelistConfig(
+            enabled=True,
+            write_rules=WhitelistRuleGroup(
+                rules=[
+                    _whitelist_rule("w1", path_patterns=["docs/**"], arbitration="whitelist"),
+                    _whitelist_rule("w2", path_patterns=["docs/**"], arbitration="confirm"),
+                    _whitelist_rule("w3", path_patterns=["docs/**"], arbitration="blacklist"),
+                ]
+            ),
+        )
+        config = _make_config(
+            write_rules=[_deny_rule("r1", path_patterns=["docs/**"])],
+            whitelist=whitelist,
+        )
+        ctx = MatchContext(tool_name="create_file", tool_input={"filePath": "docs/foo.md"})
+        result = evaluate(config, ctx)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.rule.action, "deny")
+
+    def test_AC206_whitelist_global_enabled_false_skips_matching(self):
+        """write: whitelist enabled=false は whitelist 評価をスキップする"""
+        whitelist = WhitelistConfig(
+            enabled=False,
+            write_rules=WhitelistRuleGroup(
+                rules=[
+                    _whitelist_rule("w1", path_patterns=["docs/**"], arbitration="whitelist"),
+                ]
+            ),
+        )
+        config = _make_config(
+            write_rules=[_deny_rule("r1", path_patterns=["docs/**"])],
+            whitelist=whitelist,
+        )
+        ctx = MatchContext(tool_name="create_file", tool_input={"filePath": "docs/foo.md"})
+        result = evaluate(config, ctx)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.rule.action, "deny")
+
+    def test_AC207_whitelist_group_enabled_false_skips_matching(self):
+        """write: whitelist write_rules.enabled=false は操作タイプ単位でスキップ"""
+        whitelist = WhitelistConfig(
+            enabled=True,
+            write_rules=WhitelistRuleGroup(
+                enabled=False,
+                rules=[
+                    _whitelist_rule("w1", path_patterns=["docs/**"], arbitration="whitelist"),
+                ],
+            ),
+        )
+        config = _make_config(
+            write_rules=[_deny_rule("r1", path_patterns=["docs/**"])],
+            whitelist=whitelist,
+        )
+        ctx = MatchContext(tool_name="create_file", tool_input={"filePath": "docs/foo.md"})
+        result = evaluate(config, ctx)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.rule.action, "deny")
+
+    def test_AC208_whitelist_item_enabled_false_skips_item(self):
+        """write: whitelist rule.enabled=false の項目は評価対象外"""
+        whitelist = WhitelistConfig(
+            enabled=True,
+            write_rules=WhitelistRuleGroup(
+                rules=[
+                    _whitelist_rule(
+                        "w1",
+                        path_patterns=["docs/**"],
+                        arbitration="whitelist",
+                        enabled=False,
+                    )
+                ]
+            ),
+        )
+        config = _make_config(
+            write_rules=[_deny_rule("r1", path_patterns=["docs/**"])],
+            whitelist=whitelist,
+        )
+        ctx = MatchContext(tool_name="create_file", tool_input={"filePath": "docs/foo.md"})
+        result = evaluate(config, ctx)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.rule.action, "deny")
 
 
 # ---------------------------------------------------------------------------
