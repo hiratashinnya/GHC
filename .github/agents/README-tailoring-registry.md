@@ -2,7 +2,7 @@
 
 > 資産の**汎用標準**と**プロジェクト・テーラリング済み版**の対応を管理する単一ソース。
 > プロセスはスキル等で実現するため、**テーラリングの実体は `.claude/` 配下**に置く（docs ではない）。
-> 関連：[asset-plan](../docs/methods/asset-plan.md)・[method-inventory A16](../docs/methods/method-inventory.md)・原則 [PR2](skills/spec-principles/SKILL.md)（機構/デフォルト）・[PR8](skills/spec-principles/SKILL.md)（消さず残す）。
+> 関連：[asset-plan](../../docs/methods/asset-plan.md)・[method-inventory A16](../../docs/methods/method-inventory.md)・原則 [PR2](../skills/spec-principles/SKILL.md)（機構/デフォルト）・[PR8](../skills/spec-principles/SKILL.md)（消さず残す）。
 
 ## 配置ルール
 | 区分 | 置き場 | auto-load | 役割 |
