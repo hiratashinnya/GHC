@@ -45,4 +45,3 @@ description: "Generic project-independent test strategy baseline — knobs for u
 - 3点セット（ケースMD・成績書・ログ）のテンプレが確定している。
 - 失敗時の保全フロー（隠蔽禁止・原因/対策併記）が手順化されている。
 - registry に実体パスとテーラリング内容が記録済み。
-</content>
