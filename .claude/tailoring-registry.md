@@ -28,4 +28,3 @@
 > **実装設計：architecture-design・orchestration-design・prompt-design・impl-design-pipeline**）と
 > エージェント（spec-inspector・structured-analysis・asset-auditor）は**未テーラリング＝汎用メソッドのまま active**。
 > ※ 実装設計スキルは**汎用メソッド**（本PJ固有の選択＝ヘキサゴナル/内部git/stdout プロトコルは成果物 docs 側）。テーラリングが要る場合のみ本表へ起票する。
-</content>
