@@ -5,8 +5,8 @@ description: "Generic project-independent test strategy baseline — knobs for u
 
 # テスト戦略（汎用標準・非活性ベースライン）
 
-> ここは **`.claude/standards/`** 配下の**汎用標準**。auto-load されない（active 運用は skills/ のテーラリング済み版）。
-> プロジェクトで使うときは **ノブを埋めて `.claude/skills/<name>/SKILL.md` へテーラリング**し、[tailoring-registry](../../tailoring-registry.md) に記録する。
+> ここは **`.claude/standards/`** 配下の**汎用標準**の Copilot 移植版（原本は `.claude/standards/test-strategy/`）。auto-load されない（active 運用は skills/ のテーラリング済み版）。
+> プロジェクトで使うときは **ノブを埋めて `.claude/skills/<name>/SKILL.md` へテーラリング**し、[tailoring-registry](../../../.claude/tailoring-registry.md) に記録する。
 > 原則：[spec-principles](../../skills/spec-principles/SKILL.md)（PR2 機構/デフォルト・PR7 失敗を握りつぶさない・PR8 消さず残す）。
 
 ## 不変条件（プロジェクトを問わず守る＝機構）
