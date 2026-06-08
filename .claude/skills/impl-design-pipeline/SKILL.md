@@ -37,4 +37,3 @@ disable-model-invocation: true
 ## 成果物
 - 設計索引（凍結セット）＋ architecture/orchestration/prompt 各設計 ＋ 判断ログ（DD#）。
 - 同期更新：[method-inventory](../../../docs/methods/method-inventory.md)・[asset-plan](../../../docs/methods/asset-plan.md)・[CLAUDE.md](../../../CLAUDE.md)。
-</content>
