@@ -39,4 +39,3 @@ description: Design the RUNTIME control flow — a swimlane flowchart (lanes = a
 - 実行順序の不変条件リスト（番号付き）。
 - `run_*()` 疑似コード（`match` で成功/失敗を漏れなく分岐）。
 - ログ3チャネル表＋版スタンプ定義（`MAJOR.MINOR`・版↔対応ロジック対応）。
-</content>
