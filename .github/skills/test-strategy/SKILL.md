@@ -5,8 +5,8 @@ description: "Use when planning how to test the implementation — unittest per 
 
 # テスト戦略（review-system テーラリング済・active）
 
-> 汎用標準 [`.claude/standards/test-strategy`](../../standards/test-strategy/SKILL.md) の**不変条件を継承**し、本PJのノブを埋めた版。
-> 由来・差分は [tailoring-registry](../../tailoring-registry.md)。実装の足場は [design/02 モジュール構成](../../../docs/design/02-module-architecture.md)。
+> 汎用標準 [`.claude/standards/test-strategy`](../../../.claude/standards/test-strategy/SKILL.md) の**不変条件を継承**し、本PJのノブを埋めた版。
+> 由来・差分は [tailoring-registry](../../../.claude/tailoring-registry.md)。実装の足場は [design/02 モジュール構成](../../../docs/design/02-module-architecture.md)。
 
 ## 継承する不変条件（標準のまま）
 unittest 基本／ケース＝Markdown／成績書＝ケースコピー＋実測＋commit id／ログ＝標準出力ダンプをリンク／
