@@ -38,4 +38,3 @@ description: Design LLM system-prompt templates — role constraints, prompt ass
 - 役割制約ブロック（やること/やってはいけないこと）。
 - ビルダーの段（`with_*`）と最終 frozen プロンプト。
 - 版管理表（MAJOR.MINOR ↔ 対応ハンドラ）。
-</content>
