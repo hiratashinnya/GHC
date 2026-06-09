@@ -22,7 +22,7 @@
 
 | 資産 | 標準源 | 実体（active） | テーラリング内容（要点） | 由来PJ |
 |---|---|---|---|---|
-| test-strategy | `standards/test-strategy/SKILL.md` | `skills/test-strategy/SKILL.md` | 全 public 関数を unittest／非決定（LLM）は `FakePlatformAdapter`(record-replay) で決定化＝アダプタ境界＝テスト境界／e2e＝Claude Code エージェント×`io/cli` stdout 駆動／log＝stdout ダンプ(`tee`)／dirs＝`tests/{unit,cases,reports,logs}`／版＝ケース版＋commit id＋雛形版＋基準content_hash(S6)／runner＝`python -m unittest` | review-system |
+| test-strategy | `standards/test-strategy/SKILL.md` | `skills/test-strategy/SKILL.md` | tool固有ノブ（モジュール範囲/非決定シーム/e2e/拡張版スタンプ）は各ツール開発時にDD#で確定／dirs＝`TestHooks/<tool>/`（testcase.md＋testresult.md＋test_<tool>.py）／版＝実行日＋コミットID＋実行コマンド＋総合結果（基本）／runner＝`python -m unittest` | GHC（移植元: review-system） |
 
 > その他の既存スキル（align・io-event-ledger・value-trace・mvp-scope・schema-design・domain-model・spec-pipeline・asset-pipeline／
 > **実装設計：architecture-design・orchestration-design・prompt-design・impl-design-pipeline**）と
