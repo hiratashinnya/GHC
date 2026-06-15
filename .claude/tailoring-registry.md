@@ -23,6 +23,7 @@
 | 資産 | 標準源 | 実体（active） | テーラリング内容（要点） | 由来PJ |
 |---|---|---|---|---|
 | test-strategy | `standards/test-strategy/SKILL.md` | `skills/test-strategy/SKILL.md` | tool固有ノブ（モジュール範囲/非決定シーム/e2e/拡張版スタンプ）は各ツール開発時にDD#で確定／dirs＝`TestHooks/<tool>/`（testcase.md＋testresult.md＋test_<tool>.py）／版＝実行日＋コミットID＋実行コマンド＋総合結果（基本）／runner＝`python -m unittest` | GHC（移植元: review-system） |
+| coverage-html-report | —（新規 author） | `skills/coverage-html-report/SKILL.md` | TestHooks/ を `unittest discover` で計測・`coverage_html_report/` にHTML出力／標準ライブラリのみ（Q5）・pytest不使用 | GHC |
 
 > その他の既存スキル（align・io-event-ledger・value-trace・mvp-scope・schema-design・domain-model・spec-pipeline・asset-pipeline／
 > **実装設計：architecture-design・orchestration-design・prompt-design・impl-design-pipeline**）と
